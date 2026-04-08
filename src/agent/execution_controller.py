@@ -24,6 +24,10 @@ class ExecutionController:
                 "status": "running"
             }
         
+        # 从记忆系统获取上下文
+        from src.memory import memory_manager
+        memory_context = memory_manager.get_context_memory(user_id, session_id)
+        
         # 解析用户意图
         intent_result = intent_parser.parse(user_input)
         
@@ -51,7 +55,7 @@ class ExecutionController:
                 return self._integrate_results(tool_result, context)
         
         # 直接回答
-        return self._direct_answer(user_input, context)
+        return self._direct_answer(user_input, context, memory_context)
     
     def _execute_multistep(self, plan: List[Dict[str, Any]], context: Dict[str, Any]) -> Dict[str, Any]:
         """执行多步任务"""
@@ -147,12 +151,14 @@ class ExecutionController:
             "status": "success"
         }
     
-    def _direct_answer(self, user_input: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _direct_answer(self, user_input: str, context: Dict[str, Any], memory_context: str = "") -> Dict[str, Any]:
         """直接回答用户"""
         # 构建回答提示词
         prompt = f"""请回答用户的问题：
 
 用户输入：{user_input}
+
+记忆上下文：{memory_context}
 
 当前上下文：{context}
 

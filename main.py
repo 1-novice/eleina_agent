@@ -1,4 +1,5 @@
 from src.agent.execution_controller import execution_controller
+from src.memory import memory_manager
 
 
 def main():
@@ -14,7 +15,10 @@ def main():
         if user_input.lower() == "exit":
             break
         
-        # 执行用户请求
+        # 提取并写入记忆
+        memory_manager.writer.extract_and_write_memory(user_id, session_id, user_input)
+        
+        # 获取上下文记忆
         context = {
             "user_id": user_id,
             "session_id": session_id,
@@ -22,6 +26,14 @@ def main():
         }
         
         result = execution_controller.execute(user_input, context)
+        
+        # 写入助手回复到记忆
+        if result.get("status") == "completed":
+            if "final_result" in result:
+                assistant_response = result['final_result']['answer']
+            else:
+                assistant_response = result.get('answer', '完成')
+            memory_manager.writer.write_dialog_memory(session_id, "assistant", assistant_response)
         
         # 处理执行结果
         if result.get("status") == "needs_clarification":
