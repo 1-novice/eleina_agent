@@ -2,6 +2,8 @@ from typing import Dict, List, Optional, Any, Generator
 from src.agent.model_engine import model_engine
 from src.agent.intent_parser import intent_parser
 from src.agent.reasoning_engine import reasoning_engine
+from src.tools import tool_registry, tool_selector, param_parser, tool_executor, result_formatter, security_gateway, tool_callback
+from src.skill import intent_registry as skill_intent_registry, intent_recognizer, skill_orchestrator, slot_filling, skill_tool_router, skill_state_manager
 from src.config.config import settings
 
 
@@ -28,6 +30,18 @@ class ExecutionController:
         from src.memory import memory_manager
         memory_context = memory_manager.get_context_memory(user_id, session_id)
         
+        # 检查是否有正在执行的Skill
+        skill_state = skill_state_manager.get_state(session_id)
+        if skill_state and skill_state.get("waiting_for_user"):
+            # 继续执行Skill
+            return self._continue_skill_execution(user_input, context, skill_state)
+        
+        # 识别Skill意图
+        skill_intent_result = intent_recognizer.recognize(user_input)
+        if not skill_intent_result["is_rejected"]:
+            # 执行Skill
+            return self._execute_skill(skill_intent_result, user_input, context)
+        
         # 解析用户意图
         intent_result = intent_parser.parse(user_input)
         
@@ -50,7 +64,7 @@ class ExecutionController:
             thinking_result = reasoning_engine.think(user_input, context)
             if thinking_result["tool_choice"]:
                 # 执行工具调用
-                tool_result = self._execute_tool(thinking_result["tool_choice"], thinking_result["tool_params"])
+                tool_result = self._execute_tool(thinking_result["tool_choice"], thinking_result["tool_params"], context)
                 # 整合结果
                 return self._integrate_results(tool_result, context)
         
@@ -140,16 +154,147 @@ class ExecutionController:
                 "status": "completed"
             }
     
-    def _execute_tool(self, tool_name: str, tool_params: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_skill(self, skill_intent_result: Dict[str, Any], user_input: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """执行Skill"""
+        user_id = context.get("user_id", "unknown")
+        session_id = context.get("session_id", "default")
+        skill_id = skill_intent_result.get("skill_id")
+        
+        # 提取槽位
+        slots, missing_slots = slot_filling.fill_slots(user_input, skill_id)
+        
+        # 检查是否需要澄清
+        if missing_slots:
+            questions = slot_filling.generate_clarification_questions(missing_slots, skill_id)
+            # 更新状态
+            skill_state_manager.update_state(
+                session_id=session_id,
+                skill_id=skill_id,
+                slots=slots,
+                waiting_for_user=True
+            )
+            return {
+                "status": "needs_clarification",
+                "questions": questions
+            }
+        
+        # 执行Skill编排
+        orchestration_result = skill_orchestrator.orchestrate(skill_id, slots, context)
+        
+        # 处理编排结果
+        if orchestration_result.get("status") == "needs_tool":
+            # 执行工具调用
+            tool_call = orchestration_result.get("tool_call")
+            if tool_call:
+                tool_result = self._execute_tool(
+                    tool_call.get("tool_choice"),
+                    tool_call.get("tool_params"),
+                    context
+                )
+                # 恢复执行
+                return skill_orchestrator.resume_execution(session_id, tool_result)
+        elif orchestration_result.get("status") == "needs_clarification":
+            # 更新状态
+            skill_state_manager.update_state(
+                session_id=session_id,
+                skill_id=skill_id,
+                slots=slots,
+                waiting_for_user=True
+            )
+            return orchestration_result
+        
+        # 清除状态
+        skill_state_manager.clear_state(session_id)
+        return orchestration_result
+    
+    def _continue_skill_execution(self, user_input: str, context: Dict[str, Any], skill_state: Dict[str, Any]) -> Dict[str, Any]:
+        """继续执行Skill"""
+        session_id = context.get("session_id", "default")
+        skill_id = skill_state.get("skill_id")
+        existing_slots = skill_state.get("slots", {})
+        
+        # 填充槽位
+        slots, missing_slots = slot_filling.fill_slots(user_input, skill_id, existing_slots)
+        
+        # 检查是否需要澄清
+        if missing_slots:
+            questions = slot_filling.generate_clarification_questions(missing_slots, skill_id)
+            # 更新状态
+            skill_state_manager.update_state(
+                session_id=session_id,
+                skill_id=skill_id,
+                slots=slots,
+                waiting_for_user=True
+            )
+            return {
+                "status": "needs_clarification",
+                "questions": questions
+            }
+        
+        # 执行Skill编排
+        orchestration_result = skill_orchestrator.orchestrate(skill_id, slots, context)
+        
+        # 处理编排结果
+        if orchestration_result.get("status") == "needs_tool":
+            # 执行工具调用
+            tool_call = orchestration_result.get("tool_call")
+            if tool_call:
+                tool_result = self._execute_tool(
+                    tool_call.get("tool_choice"),
+                    tool_call.get("tool_params"),
+                    context
+                )
+                # 恢复执行
+                result = skill_orchestrator.resume_execution(session_id, tool_result)
+                # 清除状态
+                skill_state_manager.clear_state(session_id)
+                return result
+        elif orchestration_result.get("status") == "needs_clarification":
+            # 更新状态
+            skill_state_manager.update_state(
+                session_id=session_id,
+                skill_id=skill_id,
+                slots=slots,
+                waiting_for_user=True
+            )
+            return orchestration_result
+        
+        # 清除状态
+        skill_state_manager.clear_state(session_id)
+        return orchestration_result
+    
+    def _execute_tool(self, tool_name: str, tool_params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """执行工具调用"""
-        # 模拟工具执行
-        # 实际实现中应该调用真实的工具
-        return {
-            "tool": tool_name,
-            "params": tool_params,
-            "result": f"工具 {tool_name} 执行成功，参数: {tool_params}",
-            "status": "success"
-        }
+        user_id = context.get("user_id", "unknown")
+        session_id = context.get("session_id", "default")
+        user_role = context.get("user_role", "user")
+        
+        # 验证工具调用
+        validation_result = security_gateway.validate_tool_call(
+            tool_name=tool_name,
+            params=tool_params,
+            user_role=user_role,
+            user_id=user_id
+        )
+        
+        if not validation_result["valid"]:
+            return {
+                "tool": tool_name,
+                "params": tool_params,
+                "result": validation_result["message"],
+                "status": "error"
+            }
+        
+        # 执行工具
+        tool_result = tool_executor.execute_tool(tool_name, validation_result.get("params", tool_params))
+        
+        # 回调处理
+        callback_result = tool_callback.callback(tool_result, context)
+        
+        # 同步状态
+        tool_callback.sync_state(tool_result, context)
+        
+        return tool_result
     
     def _direct_answer(self, user_input: str, context: Dict[str, Any], memory_context: str = "") -> Dict[str, Any]:
         """直接回答用户"""
