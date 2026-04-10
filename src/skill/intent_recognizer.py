@@ -90,7 +90,7 @@ class IntentRecognizer:
         # 转为小写
         text = text.lower()
         # 去除标点
-        text = re.sub(r'[\p{P}\p{S}]', ' ', text)
+        text = re.sub(r'[^\w\s]', ' ', text)
         # 去除多余空格
         text = re.sub(r'\s+', ' ', text).strip()
         return text
@@ -134,6 +134,9 @@ class IntentRecognizer:
         
         # 按优先级排序
         matches.sort(key=lambda x: x.get('priority', 0), reverse=True)
+        
+        # 调试：打印匹配结果
+        print(f"意图匹配结果: {matches}")
         
         return matches
 

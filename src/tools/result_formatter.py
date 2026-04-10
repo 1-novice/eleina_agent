@@ -46,11 +46,12 @@ class ResultFormatter:
             city = result.get("city", "")
             date = result.get("date", "")
             weather = result.get("weather", "")
-            temp = result.get("temp", "")
+            # 尝试使用新的字段名称，如果不存在则使用旧的字段名称
+            temperature = result.get("temperature", result.get("temp", ""))
             humidity = result.get("humidity", "")
-            wind = result.get("wind", "")
+            wind_speed = result.get("wind_speed", result.get("wind", ""))
             
-            return f"{city}{date}天气{weather}，气温{temp}℃，湿度{humidity}%，{wind}。"
+            return f"{city}{date}天气{weather}，气温{temperature}，湿度{humidity}，{wind_speed}。"
         else:
             return str(result)
     

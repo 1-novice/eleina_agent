@@ -1,6 +1,13 @@
 from typing import Dict, List, Optional, Any
-import yaml
 import os
+
+# 尝试导入yaml
+try:
+    import yaml
+    has_yaml = True
+except ImportError:
+    has_yaml = False
+    print("警告: 无法导入yaml模块，将禁用配置文件加载功能")
 
 
 class IntentRegistry:
@@ -36,6 +43,10 @@ class IntentRegistry:
         Args:
             config_path: 配置文件路径
         """
+        if not has_yaml:
+            print("警告: yaml模块不可用，跳过配置文件加载")
+            return
+        
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)

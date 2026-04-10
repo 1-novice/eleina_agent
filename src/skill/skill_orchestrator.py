@@ -206,12 +206,39 @@ class SkillOrchestrator:
             from src.tools.result_formatter import result_formatter
             formatted_result = result_formatter.format_result(tool_result)
             
+            # 将结果交给大模型进行语气和话术处理
+            from src.agent.model_engine import model_engine
+            from src.config.config import settings
+            
+            # 构建大模型提示词
+            prompt = f"请将以下天气查询结果转换为自然、友好的回答，使用动漫角色的语气：\n\n{formatted_result}"
+            
+            # 调用大模型
+            request = {
+                "model": settings.model_type,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "stream": False,
+                "user_id": "system"
+            }
+            
+            try:
+                response = model_engine.generate(request)
+                processed_answer = response.get("content", formatted_result)
+            except Exception as e:
+                print(f"大模型处理失败: {e}")
+                processed_answer = formatted_result
+            
             # 更新执行历史
             execution_info["status"] = "completed"
             
             return {
                 "status": "completed",
-                "answer": formatted_result
+                "answer": processed_answer
             }
         else:
             # 工具执行失败

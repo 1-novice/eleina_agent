@@ -1,9 +1,24 @@
 import time
-import torch
-import httpx
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from typing import List, Dict, Optional, Any, Generator
 from src.config.config import settings
+
+# 尝试导入httpx
+try:
+    import httpx
+    has_httpx = True
+except ImportError:
+    has_httpx = False
+    print("警告: 无法导入httpx模块，将使用urllib作为备选")
+
+# 尝试导入torch和transformers
+torch = None
+try:
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+    has_transformers = True
+except ImportError:
+    has_transformers = False
+    print("警告: 无法导入torch或transformers模块，将使用本地API模式")
 
 
 class ModelEngine:
@@ -15,22 +30,38 @@ class ModelEngine:
     def initialize_models(self):
         """初始化模型"""
         try:
+            # 检查是否有transformers
+            if not has_transformers:
+                # 强制使用本地API模式
+                settings.model_type = "local_api"
+                print("由于缺少依赖，强制使用本地API模式")
+            
             if settings.model_type == "local_api":
                 # 本地API模式
-                self.models["local_api"] = {
-                    "client": httpx.Client(base_url=settings.local_api_url, timeout=60.0)
-                }
-                print(f"本地API模型初始化成功，URL: {settings.local_api_url}")
+                if has_httpx:
+                    self.models["local_api"] = {
+                        "client": httpx.Client(base_url=settings.local_api_url, timeout=60.0)
+                    }
+                    print(f"本地API模型初始化成功，URL: {settings.local_api_url}")
+                else:
+                    # 使用urllib作为备选
+                    self.models["local_api"] = {
+                        "client": "urllib"
+                    }
+                    print(f"本地API模型初始化成功（使用urllib），URL: {settings.local_api_url}")
             else:
                 # 本地模型模式
+                if not has_transformers:
+                    raise ImportError("缺少transformers依赖")
+                
                 # 检查CUDA是否可用
-                cuda_available = torch.cuda.is_available()
+                cuda_available = torch.cuda.is_available() if torch else False
                 print(f"CUDA可用: {cuda_available}")
                 
                 # 加载本地模型
                 tokenizer = AutoTokenizer.from_pretrained(settings.local_model_path)
                 
-                if cuda_available:
+                if cuda_available and torch:
                     # 4bit量化配置
                     try:
                         quantization_config = BitsAndBytesConfig(
@@ -189,12 +220,22 @@ class ModelEngine:
                 "max_tokens": 1024
             }
             
-            # 发送请求，允许重定向
-            response = client.post("", json=api_request, follow_redirects=True)
-            response.raise_for_status()
-            
-            # 解析响应
-            api_response = response.json()
+            # 发送请求
+            if has_httpx and isinstance(client, httpx.Client):
+                # 使用httpx发送请求
+                response = client.post("", json=api_request, follow_redirects=True)
+                response.raise_for_status()
+                api_response = response.json()
+            else:
+                # 使用urllib发送请求
+                import urllib.request
+                import json
+                url = settings.local_api_url
+                data = json.dumps(api_request).encode('utf-8')
+                headers = {'Content-Type': 'application/json'}
+                req = urllib.request.Request(url, data=data, headers=headers)
+                with urllib.request.urlopen(req, timeout=60) as response:
+                    api_response = json.loads(response.read().decode('utf-8'))
             
             # 提取内容
             content = ""

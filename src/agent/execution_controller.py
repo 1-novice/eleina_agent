@@ -40,7 +40,20 @@ class ExecutionController:
         skill_intent_result = intent_recognizer.recognize(user_input)
         if not skill_intent_result["is_rejected"]:
             # 执行Skill
-            return self._execute_skill(skill_intent_result, user_input, context)
+            skill_result = self._execute_skill(skill_intent_result, user_input, context)
+            # 检查Skill是否需要工具
+            if skill_result.get("status") == "needs_tool":
+                # 执行工具调用
+                tool_call = skill_result.get("tool_call")
+                if tool_call:
+                    tool_result = self._execute_tool(
+                        tool_call.get("tool_choice"),
+                        tool_call.get("tool_params"),
+                        context
+                    )
+                    # 恢复执行Skill
+                    return skill_orchestrator.resume_execution(session_id, tool_result)
+            return skill_result
         
         # 解析用户意图
         intent_result = intent_parser.parse(user_input)
@@ -352,7 +365,14 @@ class ExecutionController:
 
 当前上下文：{context}
 
-请将结果整理成易于理解的自然语言。"""
+请将结果整理成易于理解的自然语言，并确保包含以下详细信息（如果工具执行结果中有的话）：
+1. 具体的温度数值
+2. 湿度数据
+3. 风速信息
+4. 天气状况描述
+5. 其他相关的天气数据
+
+请以友好、自然的语气回答，让用户能够清晰地了解天气情况。"""
         
         # 调用模型整合结果
         request = {

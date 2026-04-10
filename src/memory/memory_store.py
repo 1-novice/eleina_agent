@@ -1,19 +1,30 @@
 from typing import Dict, List, Optional, Any
 import json
-import redis
 from src.config.config import settings
+
+# 尝试导入redis
+try:
+    import redis
+    has_redis = True
+except ImportError:
+    has_redis = False
+    print("警告: 无法导入redis模块，将使用本地内存存储")
 
 
 class MemoryStore:
     def __init__(self):
         # 初始化Redis连接
-        try:
-            self.redis_client = redis.from_url(settings.redis_url, decode_responses=True)
-            self.redis_client.ping()
-            print("Redis连接成功")
-        except Exception as e:
-            print(f"Redis连接失败，使用内存存储: {e}")
-            self.redis_client = None
+        self.redis_client = None
+        if has_redis:
+            try:
+                self.redis_client = redis.from_url(settings.redis_url, decode_responses=True)
+                self.redis_client.ping()
+                print("Redis连接成功")
+            except Exception as e:
+                print(f"Redis连接失败，使用内存存储: {e}")
+                self.redis_client = None
+        else:
+            print("Redis模块不可用，使用内存存储")
         
         # 内存存储（作为Redis的降级方案）
         self.in_memory_store = {

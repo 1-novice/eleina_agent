@@ -163,8 +163,12 @@ class IntentParser:
         
         return False
     
-    def _needs_clarification(self, intent: str, slots: Dict[str, Any]) -> tuple[bool, List[str]]:
-        """判断是否需要澄清"""
+    def _needs_clarification(self, intent: str, slots: Dict[str, Any]):
+        """判断是否需要澄清
+        
+        Returns:
+            tuple[bool, List[str]]: (是否需要澄清, 澄清问题列表)
+        """
         questions = []
         
         if intent == "任务执行":
