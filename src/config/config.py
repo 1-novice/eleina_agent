@@ -12,9 +12,9 @@ class Settings:
         # API Keys
         self.openai_api_key = os.getenv('OPENAI_API_KEY', None)
         # 支持DASHSCOPE_API_KEY或QIANWEN_API_KEY（兼容旧配置）
-        self.dashscope_api_key = os.getenv('DASHSCOPE_API_KEY') or os.getenv('QIANWEN_API_KEY', None)
+        self.dashscope_api_key = os.getenv('sk-d67d72c8791845df961e722ad90ebcf3') or os.getenv('sk-d67d72c8791845df961e722ad90ebcf3', None)
         self.baidu_api_key = os.getenv('BAIDU_API_KEY', None)
-        self.qianwen_api_key = os.getenv('QIANWEN_API_KEY', '')
+        self.qianwen_api_key = os.getenv('QIANWEN_API_KEY', 'sk-d67d72c8791845df961e722ad90ebcf3')
         
         # Vector Database
         self.vector_db_type = os.getenv('VECTOR_DB_TYPE', "chromadb")
@@ -50,6 +50,8 @@ class Settings:
         # Open-Meteo API
         self.open_meteo_base_url = os.getenv('OPEN_METEO_BASE_URL', "https://api.open-meteo.com/v1")
         
+        # PDF Document Path
+        self.pdf_document_path = os.getenv('PDF_DOCUMENT_PATH', r"D:\\elainaRAG.pdf")
         
         # Logging
         self.log_level = os.getenv('LOG_LEVEL', "INFO")

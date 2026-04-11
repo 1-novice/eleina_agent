@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional, Any, Generator
+import os
 from src.agent.model_engine import model_engine
 from src.agent.intent_parser import intent_parser
 from src.agent.reasoning_engine import reasoning_engine
@@ -10,11 +11,85 @@ from src.config.config import settings
 class ExecutionController:
     def __init__(self):
         self.execution_history = {}
+        self._init_rag()
+    
+    def _init_rag(self):
+        """初始化RAG系统"""
+        try:
+            # 导入RAG模块
+            from src.rag.doc_manager import doc_manager
+            from src.rag.doc_parser import doc_parser
+            from src.rag.text_chunker import text_chunker
+            from src.rag.embedding_engine import embedding_engine
+            from src.rag.vector_store import vector_store
+            from src.config.config import settings
+            
+            print("=== 初始化RAG系统 ===")
+            
+            # 1. 加载PDF文档
+            pdf_path = settings.pdf_document_path
+            print(f"PDF文档路径: {pdf_path}")
+            
+            if not pdf_path or not os.path.exists(pdf_path):
+                print("警告: PDF文档不存在，RAG功能将不可用")
+                return
+            
+            print(f"处理文档: {pdf_path}")
+            
+            # 2. 直接从文件路径解析文档
+            parse_result = doc_parser.parse_document_by_path(pdf_path)
+            print(f"处理结果: {parse_result.get('status')}")
+            
+            if parse_result.get('status') != 'success':
+                print(f"警告: 文档解析失败 - {parse_result.get('message')}, RAG功能将不可用")
+                return
+            
+            content = parse_result.get('content', '')
+            if not content:
+                print("警告: 文档内容为空，RAG功能将不可用")
+                return
+            
+            # 3. 文本分块
+            print("开始文本分块")
+            chunks = text_chunker.chunk_text(content, strategy="semantic")
+            print(f"分块结果: {len(chunks)} 个分块")
+            
+            # 4. 向量化
+            print("开始向量化")
+            embeddings = embedding_engine.embed_batch([chunk.get('text', '') for chunk in chunks])
+            print(f"向量化结果: {len(embeddings)} 个向量")
+            
+            # 5. 存储向量
+            print("存储向量")
+            
+            # 清空旧数据，确保只使用新的PDF内容
+            vector_store.clear()
+            
+            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                chunk['vector'] = embedding
+                chunk['id'] = f"chunk_{i}"
+            
+            vector_store.add_batch(chunks)
+            vector_store.save()  # 保存到文件
+            print("向量存储完成")
+            print("=== RAG系统初始化完成 ===")
+        except Exception as e:
+            print(f"RAG系统初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     def execute(self, user_input: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """执行用户请求"""
         user_id = context.get("user_id", "unknown")
         session_id = context.get("session_id", "default")
+        request_id = context.get("request_id", f"{user_id}_{session_id}_{hash(user_input)}")
+        
+        print(f"[执行控制器] 开始处理请求: {request_id}")
+        
+        # 检查是否正在处理同一请求（防止重复调用）
+        if request_id in self.execution_history.get(user_id, {}).get(session_id, {}):
+            print(f"[执行控制器] 检测到重复请求，跳过处理: {request_id}")
+            return {"status": "error", "message": "请求正在处理中"}
         
         # 初始化执行历史
         if user_id not in self.execution_history:
@@ -26,63 +101,101 @@ class ExecutionController:
                 "status": "running"
             }
         
-        # 从记忆系统获取上下文
-        from src.memory import memory_manager
-        memory_context = memory_manager.get_context_memory(user_id, session_id)
+        # 标记请求正在处理
+        self.execution_history[user_id][session_id]["current_request"] = request_id
         
-        # 检查是否有正在执行的Skill
-        skill_state = skill_state_manager.get_state(session_id)
-        if skill_state and skill_state.get("waiting_for_user"):
-            # 继续执行Skill
-            return self._continue_skill_execution(user_input, context, skill_state)
+        # 记录开始时间
+        import time
+        start_time = time.time()
         
-        # 识别Skill意图
-        skill_intent_result = intent_recognizer.recognize(user_input)
-        if not skill_intent_result["is_rejected"]:
-            # 执行Skill
-            skill_result = self._execute_skill(skill_intent_result, user_input, context)
-            # 检查Skill是否需要工具
-            if skill_result.get("status") == "needs_tool":
-                # 执行工具调用
-                tool_call = skill_result.get("tool_call")
-                if tool_call:
-                    tool_result = self._execute_tool(
-                        tool_call.get("tool_choice"),
-                        tool_call.get("tool_params"),
-                        context
-                    )
-                    # 恢复执行Skill
-                    return skill_orchestrator.resume_execution(session_id, tool_result)
-            return skill_result
-        
-        # 解析用户意图
-        intent_result = intent_parser.parse(user_input)
-        
-        # 检查是否需要澄清
-        if intent_result["needs_clarification"]:
+        try:
+            # 首先执行RAG检索
+            print("[执行控制器] 开始执行RAG检索")
+            rag_result = self._execute_rag(user_input, context)
+            
+            # 如果RAG检索成功并返回了回答，直接返回（避免重复调用大模型）
+            if rag_result and rag_result.get("status") == "completed" and rag_result.get("answer"):
+                print(f"[执行控制器] RAG检索成功，直接返回结果，耗时: {(time.time() - start_time):.2f}秒")
+                return {
+                    "status": "completed",
+                    "answer": rag_result.get("answer", ""),
+                    "rag_result": rag_result,
+                    "usage": rag_result.get("usage", {})
+                }
+            
+            # 从记忆系统获取上下文
+            from src.memory import memory_manager
+            memory_context = memory_manager.get_context_memory(user_id, session_id)
+            
+            # 检查是否有正在执行的Skill
+            skill_state = skill_state_manager.get_state(session_id)
+            if skill_state and skill_state.get("waiting_for_user"):
+                # 继续执行Skill
+                print("[执行控制器] 继续执行Skill")
+                return self._continue_skill_execution(user_input, context, skill_state)
+            
+            # 识别Skill意图
+            skill_intent_result = intent_recognizer.recognize(user_input)
+            if not skill_intent_result["is_rejected"]:
+                # 执行Skill
+                print("[执行控制器] 执行Skill")
+                skill_result = self._execute_skill(skill_intent_result, user_input, context)
+                # 检查Skill是否需要工具
+                if skill_result.get("status") == "needs_tool":
+                    # 执行工具调用
+                    tool_call = skill_result.get("tool_call")
+                    if tool_call:
+                        tool_result = self._execute_tool(
+                            tool_call.get("tool_choice"),
+                            tool_call.get("tool_params"),
+                            context
+                        )
+                        # 恢复执行Skill
+                        return skill_orchestrator.resume_execution(session_id, tool_result)
+                return skill_result
+            
+            # 解析用户意图
+            intent_result = intent_parser.parse(user_input)
+            
+            # 检查是否需要澄清
+            if intent_result["needs_clarification"]:
+                return {
+                    "status": "needs_clarification",
+                    "questions": intent_result["clarification_questions"]
+                }
+            
+            # 检查是否需要多步执行
+            if intent_result["needs_multistep"]:
+                # 规划复杂任务
+                plan = reasoning_engine.plan(user_input)
+                return self._execute_multistep(plan, context)
+            
+            # 检查是否需要工具
+            if intent_result["needs_tool"]:
+                # 思考并选择工具
+                thinking_result = reasoning_engine.think(user_input, context)
+                if thinking_result["tool_choice"]:
+                    # 执行工具调用
+                    tool_result = self._execute_tool(thinking_result["tool_choice"], thinking_result["tool_params"], context)
+                    # 整合结果
+                    return self._integrate_results(tool_result, context)
+            
+            # 直接回答（如果RAG没有返回结果）
+            print("[执行控制器] RAG未返回结果，执行直接回答")
+            return self._direct_answer(user_input, context, memory_context)
+        except Exception as e:
+            print(f"[执行控制器] 执行失败: {e}")
+            import traceback
+            traceback.print_exc()
             return {
-                "status": "needs_clarification",
-                "questions": intent_result["clarification_questions"]
+                "status": "error",
+                "message": str(e)
             }
-        
-        # 检查是否需要多步执行
-        if intent_result["needs_multistep"]:
-            # 规划复杂任务
-            plan = reasoning_engine.plan(user_input)
-            return self._execute_multistep(plan, context)
-        
-        # 检查是否需要工具
-        if intent_result["needs_tool"]:
-            # 思考并选择工具
-            thinking_result = reasoning_engine.think(user_input, context)
-            if thinking_result["tool_choice"]:
-                # 执行工具调用
-                tool_result = self._execute_tool(thinking_result["tool_choice"], thinking_result["tool_params"], context)
-                # 整合结果
-                return self._integrate_results(tool_result, context)
-        
-        # 直接回答
-        return self._direct_answer(user_input, context, memory_context)
+        finally:
+            # 清除请求标记
+            if user_id in self.execution_history and session_id in self.execution_history[user_id]:
+                self.execution_history[user_id][session_id].pop("current_request", None)
+            print(f"[执行控制器] 请求处理完成，耗时: {(time.time() - start_time):.2f}秒")
     
     def _execute_multistep(self, plan: List[Dict[str, Any]], context: Dict[str, Any]) -> Dict[str, Any]:
         """执行多步任务"""
@@ -448,6 +561,90 @@ class ExecutionController:
             }
         
         return self.execution_history[user_id][session_id]
+    
+    def _execute_rag(self, user_input: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """执行RAG检索"""
+        import time
+        start_time = time.time()
+        
+        def rag_task():
+            try:
+                # 导入RAG模块
+                from src.rag.retriever import retriever
+                from src.rag.reranker import reranker
+                from src.rag.prompt_builder import prompt_builder
+                from src.config.config import settings
+                
+                print("=== 开始RAG检索 ===")
+                
+                # 1. 检索相关文档
+                print(f"检索相关文档: {user_input}")
+                retrieved_docs = retriever.retrieve(user_input, k=3)
+                print(f"检索结果: {len(retrieved_docs)} 个文档")
+                
+                if not retrieved_docs:
+                    print("错误: 知识库中没有找到相关信息")
+                    return {"status": "error", "message": "知识库中没有找到相关信息"}
+                
+                # 2. 重排
+                print("开始重排")
+                reranked_docs = reranker.rerank(user_input, retrieved_docs, top_k=3)
+                print(f"重排结果: {len(reranked_docs)} 个文档")
+                
+                # 3. 构建上下文
+                print("构建上下文")
+                prompt = prompt_builder.build_prompt(user_input, reranked_docs)
+                
+                # 4. 生成回答
+                print("生成回答")
+                request = {
+                    "model": settings.model_type,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "stream": context.get("stream", False),
+                    "user_id": context.get("user_id", "unknown")
+                }
+                
+                from src.agent.model_engine import model_engine
+                response = model_engine.generate(request)
+                
+                return {
+                    "status": "completed",
+                    "answer": response.get("content", ""),
+                    "usage": response.get("usage", {})
+                }
+            except Exception as e:
+                print(f"RAG执行失败: {e}")
+                import traceback
+                traceback.print_exc()
+                return {
+                    "status": "error",
+                    "message": str(e)
+                }
+        
+        # 执行RAG任务并检查超时
+        import threading
+        result = {"status": "error", "message": "RAG检索超时"}
+        
+        def target():
+            nonlocal result
+            result = rag_task()
+        
+        thread = threading.Thread(target=target)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=600)  # 600秒超时
+        
+        # 检查是否超时
+        if thread.is_alive():
+            print("RAG检索超时，跳过RAG检索")
+            return {"status": "timeout", "message": "RAG检索超时"}
+        
+        return result
 
 
 # 全局执行控制器实例

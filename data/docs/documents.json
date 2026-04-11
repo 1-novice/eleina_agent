@@ -1,0 +1,18 @@
+{
+  "5b5c64ae6f2b12daba2434c8be438855": {
+    "id": "5b5c64ae6f2b12daba2434c8be438855",
+    "file_name": "elainaRAG.pdf",
+    "file_path": "data\\docs\\elainaRAG.pdf",
+    "original_path": "D:\\elainaRAG.pdf",
+    "version": 1,
+    "status": "已生效",
+    "upload_time": "2026-04-10T20:40:18.218085",
+    "uploader": "system",
+    "title": "PDF文档",
+    "source": "config",
+    "tags": [],
+    "permissions": [
+      "public"
+    ]
+  }
+}

@@ -51,9 +51,12 @@ def main():
     user_id = "test_user"
     session_id = "default_session"
     
+    # 交互模式
     while True:
         user_input = input("用户: ")
+        
         if user_input.lower() == "exit":
+            print("再见！")
             break
         
         # 提取并写入记忆
@@ -67,6 +70,7 @@ def main():
         }
         
         # 执行查询
+        print("执行查询...")
         result = execution_controller.execute(user_input, context)
         
         # 写入助手回复到记忆
