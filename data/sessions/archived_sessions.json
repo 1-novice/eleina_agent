@@ -1,0 +1,61 @@
+{
+  "daf3ed60-54cd-4766-9d4a-86e3982b4337": {
+    "session_id": "daf3ed60-54cd-4766-9d4a-86e3982b4337",
+    "user_id": "user_001",
+    "created_at": "2026-04-11T22:45:32.374753",
+    "last_active": "2026-04-11T22:45:32.374753",
+    "status": "archived",
+    "context": [
+      {
+        "role": "user",
+        "content": "你好",
+        "timestamp": "2024-01-01T00:00:00"
+      }
+    ],
+    "task_info": null,
+    "metadata": {
+      "device": "desktop",
+      "source": "web",
+      "ip": "unknown"
+    },
+    "archived_at": "2026-04-11T22:45:32.374753"
+  },
+  "a8ccf1c0-555c-4f35-b0e6-7c732ab43f6a": {
+    "session_id": "a8ccf1c0-555c-4f35-b0e6-7c732ab43f6a",
+    "user_id": "user_001",
+    "created_at": "2026-04-11T22:46:05.448311",
+    "last_active": "2026-04-11T22:46:05.448311",
+    "status": "archived",
+    "context": [
+      {
+        "role": "user",
+        "content": "你好",
+        "timestamp": "2024-01-01T00:00:00"
+      }
+    ],
+    "task_info": null,
+    "metadata": {
+      "device": "desktop",
+      "source": "web",
+      "ip": "unknown"
+    },
+    "archived_at": "2026-04-11T22:46:05.448311"
+  },
+  "25655b1a-00ef-464c-bd16-4c3c81a295a2": {
+    "session_id": "25655b1a-00ef-464c-bd16-4c3c81a295a2",
+    "user_id": "user_001",
+    "created_at": "2026-04-11T22:46:05.468333",
+    "last_active": "2026-04-11T22:46:05.469337",
+    "status": "archived",
+    "context": [],
+    "task_info": null,
+    "metadata": {
+      "device": "unknown",
+      "source": "unknown",
+      "ip": "unknown"
+    },
+    "resumed_at": "2026-04-11T22:46:05.469337",
+    "paused_reason": "user_request",
+    "archived_at": "2026-04-11T22:46:05.469337"
+  }
+}

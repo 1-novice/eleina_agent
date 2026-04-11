@@ -1,0 +1,41 @@
+{
+  "b670be28-fbce-473e-add2-d3643eb53ad1": {
+    "task_id": "b670be28-fbce-473e-add2-d3643eb53ad1",
+    "intent": "order_train_ticket",
+    "status": "completed",
+    "current_step": 3,
+    "total_steps": 4,
+    "slots": {
+      "from": "北京",
+      "to": "上海",
+      "date": "2026-04-15"
+    },
+    "session_id": null,
+    "created_at": "2026-04-11T22:46:05.448311",
+    "updated_at": "2026-04-11T22:46:05.464198",
+    "steps": [
+      {
+        "step_number": 1,
+        "step_name": "确认出发地",
+        "status": "completed",
+        "completed_at": "2026-04-11T22:46:05.455865"
+      },
+      {
+        "step_number": 2,
+        "step_name": "确认目的地",
+        "status": "completed",
+        "completed_at": "2026-04-11T22:46:05.458668"
+      },
+      {
+        "step_number": 3,
+        "step_name": "选择日期",
+        "status": "running",
+        "completed_at": null
+      }
+    ],
+    "results": {
+      "ticket_id": "T12345"
+    },
+    "completed_at": "2026-04-11T22:46:05.464198"
+  }
+}
