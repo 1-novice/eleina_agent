@@ -1,0 +1,227 @@
+{
+  "generated_at": "2026-04-11T14:47:21.442415",
+  "summary": {
+    "metrics": {
+      "total_queries": 5,
+      "total_retrieval_time": 0.0,
+      "avg_retrieval_time": 0.0,
+      "total_rerank_time": 250.0,
+      "avg_rerank_time": 50.0,
+      "total_quality_score": 4.290000000000001,
+      "avg_quality_score": 0.8580000000000002,
+      "total_relevance_score": 1.6640000000000001,
+      "avg_relevance_score": 0.33280000000000004,
+      "total_diversity_score": 5.0,
+      "avg_diversity_score": 1.0,
+      "success_rate": 1.0,
+      "failures": 0
+    },
+    "evaluation_count": 5,
+    "last_evaluation": {
+      "timestamp": "2026-04-11T14:47:21.442415",
+      "query": "伊蕾娜擅长什么魔法",
+      "retrieved_docs_count": 3,
+      "retrieval_time_ms": 0.0,
+      "rerank_time_ms": 50.0,
+      "total_time_ms": 50.0,
+      "document_quality_scores": [
+        0.8500000000000001,
+        0.8500000000000001,
+        0.8500000000000001
+      ],
+      "avg_document_quality": 0.8500000000000001,
+      "relevance_score": 0.34,
+      "diversity_score": 1.0,
+      "overall_score": 0.625,
+      "retrieved_docs": [
+        {
+          "id": "doc1",
+          "score": 0.92,
+          "text_length": 40
+        },
+        {
+          "id": "doc2",
+          "score": 0.85,
+          "text_length": 42
+        },
+        {
+          "id": "doc3",
+          "score": 0.78,
+          "text_length": 33
+        }
+      ]
+    }
+  },
+  "full_history": [
+    {
+      "timestamp": "2026-04-11T14:47:21.442415",
+      "query": "你的师傅是谁",
+      "retrieved_docs_count": 3,
+      "retrieval_time_ms": 0.0,
+      "rerank_time_ms": 50.0,
+      "total_time_ms": 50.0,
+      "document_quality_scores": [
+        0.9099999999999999,
+        0.9099999999999999,
+        0.8500000000000001
+      ],
+      "avg_document_quality": 0.89,
+      "relevance_score": 0.304,
+      "diversity_score": 1.0,
+      "overall_score": 0.619,
+      "retrieved_docs": [
+        {
+          "id": "doc1",
+          "score": 0.95,
+          "text_length": 54
+        },
+        {
+          "id": "doc2",
+          "score": 0.88,
+          "text_length": 51
+        },
+        {
+          "id": "doc3",
+          "score": 0.45,
+          "text_length": 35
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-11T14:47:21.442415",
+      "query": "芙兰是谁",
+      "retrieved_docs_count": 3,
+      "retrieval_time_ms": 0.0,
+      "rerank_time_ms": 50.0,
+      "total_time_ms": 50.0,
+      "document_quality_scores": [
+        0.8500000000000001,
+        0.8500000000000001,
+        0.8500000000000001
+      ],
+      "avg_document_quality": 0.8500000000000001,
+      "relevance_score": 0.34,
+      "diversity_score": 1.0,
+      "overall_score": 0.625,
+      "retrieved_docs": [
+        {
+          "id": "doc1",
+          "score": 0.92,
+          "text_length": 40
+        },
+        {
+          "id": "doc2",
+          "score": 0.85,
+          "text_length": 42
+        },
+        {
+          "id": "doc3",
+          "score": 0.78,
+          "text_length": 33
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-11T14:47:21.442415",
+      "query": "伊蕾娜的性格特点",
+      "retrieved_docs_count": 3,
+      "retrieval_time_ms": 0.0,
+      "rerank_time_ms": 50.0,
+      "total_time_ms": 50.0,
+      "document_quality_scores": [
+        0.8500000000000001,
+        0.8500000000000001,
+        0.8500000000000001
+      ],
+      "avg_document_quality": 0.8500000000000001,
+      "relevance_score": 0.34,
+      "diversity_score": 1.0,
+      "overall_score": 0.625,
+      "retrieved_docs": [
+        {
+          "id": "doc1",
+          "score": 0.92,
+          "text_length": 40
+        },
+        {
+          "id": "doc2",
+          "score": 0.85,
+          "text_length": 42
+        },
+        {
+          "id": "doc3",
+          "score": 0.78,
+          "text_length": 33
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-11T14:47:21.442415",
+      "query": "魔女之旅的主角",
+      "retrieved_docs_count": 3,
+      "retrieval_time_ms": 0.0,
+      "rerank_time_ms": 50.0,
+      "total_time_ms": 50.0,
+      "document_quality_scores": [
+        0.8500000000000001,
+        0.8500000000000001,
+        0.8500000000000001
+      ],
+      "avg_document_quality": 0.8500000000000001,
+      "relevance_score": 0.34,
+      "diversity_score": 1.0,
+      "overall_score": 0.625,
+      "retrieved_docs": [
+        {
+          "id": "doc1",
+          "score": 0.92,
+          "text_length": 40
+        },
+        {
+          "id": "doc2",
+          "score": 0.85,
+          "text_length": 42
+        },
+        {
+          "id": "doc3",
+          "score": 0.78,
+          "text_length": 33
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-11T14:47:21.442415",
+      "query": "伊蕾娜擅长什么魔法",
+      "retrieved_docs_count": 3,
+      "retrieval_time_ms": 0.0,
+      "rerank_time_ms": 50.0,
+      "total_time_ms": 50.0,
+      "document_quality_scores": [
+        0.8500000000000001,
+        0.8500000000000001,
+        0.8500000000000001
+      ],
+      "avg_document_quality": 0.8500000000000001,
+      "relevance_score": 0.34,
+      "diversity_score": 1.0,
+      "overall_score": 0.625,
+      "retrieved_docs": [
+        {
+          "id": "doc1",
+          "score": 0.92,
+          "text_length": 40
+        },
+        {
+          "id": "doc2",
+          "score": 0.85,
+          "text_length": 42
+        },
+        {
+          "id": "doc3",
+          "score": 0.78,
+          "text_length": 33
+        }
+      ]
+    }
+  ]
+}
