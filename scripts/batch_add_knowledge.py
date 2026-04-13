@@ -15,14 +15,16 @@ from src.rag.vector_store import vector_store
 from src.rag.retriever import retriever
 
 
-def find_md_files(directory):
-    """查找目录中所有的md文件"""
-    md_files = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.md'):
-                md_files.append(os.path.join(root, file))
-    return md_files
+def find_supported_files(directory):
+    """查找目录中所有支持的文档文件"""
+    supported_extensions = ['.md', '.txt', '.pdf', '.docx', '.doc', '.markdown']
+    files = []
+    for root, dirs, files_in_dir in os.walk(directory):
+        for file in files_in_dir:
+            ext = os.path.splitext(file)[1].lower()
+            if ext in supported_extensions:
+                files.append(os.path.join(root, file))
+    return files
 
 
 def process_file(file_path):
@@ -58,31 +60,32 @@ def main():
     knowledge_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src", "rag", "knowledge")
     
     print("=" * 60)
-    print("批量添加src/rag/knowledge目录中的md文件")
+    print("批量添加src/rag/knowledge目录中的文档文件")
     print("=" * 60)
     print(f"knowledge目录路径: {knowledge_dir}")
+    print("支持的文件类型: MD, TXT, PDF, DOCX, DOC")
     
     # 检查目录是否存在
     if not os.path.exists(knowledge_dir):
         print(f"❌ knowledge目录不存在: {knowledge_dir}")
-        print("请先创建knowledge目录并放入md文件")
+        print("请先创建knowledge目录并放入文档文件")
         return
     
-    # 查找所有md文件
-    md_files = find_md_files(knowledge_dir)
-    print(f"找到 {len(md_files)} 个md文件")
+    # 查找所有支持的文档文件
+    docs = find_supported_files(knowledge_dir)
+    print(f"找到 {len(docs)} 个文档文件")
     
-    if not md_files:
-        print("❌ 没有找到任何md文件")
+    if not docs:
+        print("❌ 没有找到任何文档文件")
         return
     
     # 列出找到的文件
     print("\n找到的文件:")
-    for i, file in enumerate(md_files, 1):
+    for i, file in enumerate(docs, 1):
         print(f"  {i}. {os.path.basename(file)}")
     
     # 自动确认操作
-    print(f"\n自动确认添加 {len(md_files)} 个文件到RAG系统...")
+    print(f"\n自动确认添加 {len(docs)} 个文件到RAG系统...")
     
     # 自动清空现有向量存储
     print("清空现有向量存储...")
@@ -93,7 +96,7 @@ def main():
     total_embeddings = 0
     failed_files = []
     
-    for file_path in md_files:
+    for file_path in docs:
         result = process_file(file_path)
         if result:
             chunks, embeddings = result
@@ -115,7 +118,7 @@ def main():
     print("\n" + "=" * 60)
     print("批量添加完成！")
     print("=" * 60)
-    print(f"成功处理文件: {len(md_files) - len(failed_files)} / {len(md_files)}")
+    print(f"成功处理文件: {len(docs) - len(failed_files)} / {len(docs)}")
     print(f"总块数: {total_chunks}")
     print(f"总向量数: {total_embeddings}")
     

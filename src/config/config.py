@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Settings:
@@ -7,7 +10,7 @@ class Settings:
         self.model_type = os.getenv('MODEL_TYPE', 'local_api')
         self.local_model_path = os.getenv('LOCAL_MODEL_PATH', r"D:\qwenmodel")
         self.lora_path = os.getenv('LORA_PATH', r"D:\LLaMA-Factory\saves\Qwen2.5-7B-Instruct\lora\train_2026-04-06-15-47-06")
-        self.local_api_url = os.getenv('LOCAL_API_URL', "http://127.0.0.1:8000/v1/chat/completions")
+        self.local_api_url = os.getenv('LOCAL_API_URL', "http://127.0.0.1:8080/v1/chat/completions")
         
         # API Keys
         self.openai_api_key = os.getenv('OPENAI_API_KEY', None)
@@ -29,6 +32,13 @@ class Settings:
         
         # Redis
         self.redis_url = os.getenv('REDIS_URL', "redis://localhost:6379/0")
+        
+        # MySQL Database
+        self.mysql_host = os.getenv('MYSQL_HOST', "localhost")
+        self.mysql_port = int(os.getenv('MYSQL_PORT', "3306"))
+        self.mysql_user = os.getenv('MYSQL_USER', "root")
+        self.mysql_password = os.getenv('MYSQL_PASSWORD', "yln050906")
+        self.mysql_database = os.getenv('MYSQL_DATABASE', "eleina_agent")
         
         # API Configuration
         self.api_host = os.getenv('API_HOST', "0.0.0.0")

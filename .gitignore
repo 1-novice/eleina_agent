@@ -5,6 +5,16 @@ env.local/
 env.development.local/
 env.test.local/
 env.production.local/
+.venv/
+.venv.local/
+
+# Poetry 虚拟环境（Poetry 默认创建的目录）
+.poetry/
+.pypoetry/
+poetry.toml
+# Poetry 缓存目录
+.cache/
+.mypy_cache/
 
 # Python编译文件
 __pycache__/
