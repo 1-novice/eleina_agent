@@ -27,15 +27,15 @@ class ModelEngine:
             # 本地API模式
             if has_httpx:
                 self.models["local_api"] = {
-                    "client": httpx.Client(base_url=settings.local_api_url, timeout=120.0)
+                    "client": httpx.Client(base_url=settings.local_api_url, timeout=600.0)
                 }
-                print(f"本地API模型初始化成功，URL: {settings.local_api_url}，超时时间: 120秒")
+                print(f"本地API模型初始化成功，URL: {settings.local_api_url}，超时时间: 600秒")
             else:
                 # 使用urllib作为备选
                 self.models["local_api"] = {
                     "client": "urllib"
                 }
-                print(f"本地API模型初始化成功（使用urllib），URL: {settings.local_api_url}，超时时间: 120秒")
+                print(f"本地API模型初始化成功（使用urllib），URL: {settings.local_api_url}，超时时间: 600秒")
         except Exception as e:
             print(f"模型初始化失败: {e}")
             # 创建一个简单的回退模型
