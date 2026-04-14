@@ -1,19 +1,16 @@
-"""多模态接入模块 - 支持图像、语音输入输出"""
+"""图像多模态接入模块 - 独立无状态设计"""
 
 from .image_to_text import ImageToText, image_to_text
-from .speech_to_text import SpeechToText, speech_to_text
-from .text_to_speech import TextToSpeech, text_to_speech
-from .multimodal_processor import MultimodalProcessor
+from .multimodal_processor import ImageProcessor
+from .character_recognizer import CharacterRecognizer, character_recognizer
 from .config import MultimodalConfig, multimodal_config
 
 __all__ = [
     "ImageToText",
     "image_to_text",
-    "SpeechToText",
-    "speech_to_text",
-    "TextToSpeech",
-    "text_to_speech",
-    "MultimodalProcessor",
+    "ImageProcessor",
+    "CharacterRecognizer",
+    "character_recognizer",
     "MultimodalConfig",
     "multimodal_config"
 ]

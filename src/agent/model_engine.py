@@ -1,8 +1,8 @@
 import time
-from typing import List, Dict, Optional, Any
+import json
+from typing import List, Dict, Optional, Any, Generator
 from src.config.config import settings
 
-# 尝试导入httpx
 try:
     import httpx
     has_httpx = True
@@ -20,25 +20,21 @@ class ModelEngine:
     def initialize_models(self):
         """初始化模型"""
         try:
-            # 强制使用本地API模式
             settings.model_type = "local_api"
             print("使用本地API模式")
             
-            # 本地API模式
             if has_httpx:
                 self.models["local_api"] = {
                     "client": httpx.Client(base_url=settings.local_api_url, timeout=600.0)
                 }
                 print(f"本地API模型初始化成功，URL: {settings.local_api_url}，超时时间: 600秒")
             else:
-                # 使用urllib作为备选
                 self.models["local_api"] = {
                     "client": "urllib"
                 }
                 print(f"本地API模型初始化成功（使用urllib），URL: {settings.local_api_url}，超时时间: 600秒")
         except Exception as e:
             print(f"模型初始化失败: {e}")
-            # 创建一个简单的回退模型
             self.models[settings.model_type] = {
                 "client": "urllib"
             }
@@ -52,16 +48,16 @@ class ModelEngine:
         stream = request.get("stream", False)
         user_id = request.get("user_id", "unknown")
         
-        # 调用模型
         try:
             if model_name not in self.models:
                 raise ValueError(f"模型 {model_name} 未初始化")
             
-            # 只使用本地API模式
-            return self._generate_local_api(messages, stream, user_id)
+            if stream:
+                return self._generate_local_api_stream(messages, user_id)
+            else:
+                return self._generate_local_api(messages, stream, user_id)
         except Exception as e:
             print(f"模型生成失败: {e}")
-            # 降级处理
             return {
                 "content": "抱歉，我暂时无法处理您的请求，请稍后再试。",
                 "tool_calls": [],
@@ -71,6 +67,21 @@ class ModelEngine:
                 },
                 "finish_reason": "error"
             }
+    
+    def generate_stream(self, request: Dict[str, Any]) -> Generator[str, None, None]:
+        """流式生成响应"""
+        model_name = request.get("model", settings.model_type)
+        messages = request.get("messages", [])
+        user_id = request.get("user_id", "unknown")
+        
+        try:
+            if model_name not in self.models:
+                raise ValueError(f"模型 {model_name} 未初始化")
+            
+            yield from self._stream_local_api(messages, user_id)
+        except Exception as e:
+            print(f"流式生成失败: {e}")
+            yield "抱歉，我暂时无法处理您的请求，请稍后再试。"
     
     def _generate_local_api(self, messages: List[Dict[str, str]], stream: bool, user_id: str) -> Dict[str, Any]:
         """使用本地API生成响应"""
@@ -83,13 +94,9 @@ class ModelEngine:
             if not client:
                 raise ValueError("本地API客户端未初始化")
             
-            # 确保接口路径统一，移除末尾冗余斜杠
             api_path = settings.local_api_url.rstrip('/')
-            
-            # 读取system prompt
             system_prompt = self._get_system_prompt()
             
-            # 构建完整的messages，添加system prompt
             full_messages = [
                 {
                     "role": "system",
@@ -97,7 +104,6 @@ class ModelEngine:
                 }
             ] + messages
             
-            # 构建API请求
             api_request = {
                 "model": "qwen2.5-7b-instruct",
                 "messages": full_messages,
@@ -107,20 +113,15 @@ class ModelEngine:
                 "max_tokens": 1024
             }
             
-            # 记录请求日志
             print(f"[大模型调用] 用户: {user_id}, 消息数: {len(messages)}, 接口: {api_path}")
             
-            # 发送请求
             if has_httpx and isinstance(client, httpx.Client):
-                # 使用httpx发送请求
                 print(f"[大模型调用] 开始发送HTTP请求...")
                 response = client.post("", json=api_request, follow_redirects=True)
                 response.raise_for_status()
                 api_response = response.json()
             else:
-                # 使用urllib发送请求
                 import urllib.request
-                import json
                 url = api_path
                 data = json.dumps(api_request).encode('utf-8')
                 headers = {'Content-Type': 'application/json'}
@@ -129,25 +130,21 @@ class ModelEngine:
                 with urllib.request.urlopen(req, timeout=120) as response:
                     api_response = json.loads(response.read().decode('utf-8'))
             
-            # 记录响应日志
             prompt_tokens = api_response.get("usage", {}).get("prompt_tokens", 0)
             completion_tokens = api_response.get("usage", {}).get("completion_tokens", 0)
             print(f"[大模型调用] 请求完成，耗时: {(time.time() - start_time):.2f}秒, "
                   f"输入tokens: {prompt_tokens}, 输出tokens: {completion_tokens}")
             
-            # 提取内容
             content = ""
             if "choices" in api_response and len(api_response["choices"]) > 0:
                 choice = api_response["choices"][0]
                 if "message" in choice and "content" in choice["message"]:
                     content = choice["message"]["content"]
             
-            # 提取token使用情况
             usage = api_response.get("usage", {})
             prompt_tokens = usage.get("prompt_tokens", 0)
             completion_tokens = usage.get("completion_tokens", 0)
             
-            # 记录token使用情况
             self._record_token_usage(user_id, prompt_tokens, completion_tokens)
             
             return {
@@ -158,7 +155,6 @@ class ModelEngine:
             }
         except Exception as e:
             print(f"本地API调用失败: {e}")
-            # 降级处理
             return {
                 "content": "抱歉，我暂时无法处理您的请求，请稍后再试。",
                 "tool_calls": [],
@@ -168,6 +164,138 @@ class ModelEngine:
                 },
                 "finish_reason": "error"
             }
+    
+    def _generate_local_api_stream(self, messages: List[Dict[str, str]], user_id: str) -> Dict[str, Any]:
+        """使用本地API流式生成响应"""
+        try:
+            model_info = self.models["local_api"]
+            client = model_info.get("client")
+            
+            if not client or not has_httpx:
+                raise ValueError("流式输出需要httpx客户端")
+            
+            api_path = settings.local_api_url.rstrip('/')
+            system_prompt = self._get_system_prompt()
+            
+            full_messages = [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                }
+            ] + messages
+            
+            api_request = {
+                "model": "qwen2.5-7b-instruct",
+                "messages": full_messages,
+                "stream": True,
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "max_tokens": 1024
+            }
+            
+            print(f"[大模型调用] 流式输出 - 用户: {user_id}, 消息数: {len(messages)}")
+            
+            def stream_generator():
+                with client.stream("POST", "", json=api_request, follow_redirects=True) as response:
+                    response.raise_for_status()
+                    buffer = ""
+                    for chunk in response.iter_text(chunk_size=1024):
+                        buffer += chunk
+                        while "data: " in buffer:
+                            idx = buffer.find("data: ")
+                            end_idx = buffer.find("\n\n", idx)
+                            if end_idx == -1:
+                                break
+                            json_str = buffer[idx + 6:end_idx].strip()
+                            buffer = buffer[end_idx + 2:]
+                            if json_str == "[DONE]":
+                                return
+                            try:
+                                data = json.loads(json_str)
+                                if data.get("choices"):
+                                    delta = data["choices"][0].get("delta", {})
+                                    content = delta.get("content", "")
+                                    if content:
+                                        yield content
+                            except json.JSONDecodeError:
+                                continue
+            
+            return {
+                "content": stream_generator(),
+                "tool_calls": [],
+                "usage": {},
+                "finish_reason": "stop",
+                "stream": True
+            }
+        except Exception as e:
+            print(f"本地API流式调用失败: {e}")
+            return {
+                "content": "抱歉，我暂时无法处理您的请求，请稍后再试。",
+                "tool_calls": [],
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0
+                },
+                "finish_reason": "error",
+                "stream": False
+            }
+    
+    def _stream_local_api(self, messages: List[Dict[str, str]], user_id: str) -> Generator[str, None, None]:
+        """使用本地API流式生成响应（直接返回生成器）"""
+        try:
+            model_info = self.models["local_api"]
+            client = model_info.get("client")
+            
+            if not client or not has_httpx:
+                raise ValueError("流式输出需要httpx客户端")
+            
+            api_path = settings.local_api_url.rstrip('/')
+            system_prompt = self._get_system_prompt()
+            
+            full_messages = [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                }
+            ] + messages
+            
+            api_request = {
+                "model": "qwen2.5-7b-instruct",
+                "messages": full_messages,
+                "stream": True,
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "max_tokens": 1024
+            }
+            
+            print(f"[大模型调用] 流式输出 - 用户: {user_id}, 消息数: {len(messages)}")
+            
+            with client.stream("POST", "", json=api_request, follow_redirects=True) as response:
+                response.raise_for_status()
+                buffer = ""
+                for chunk in response.iter_text(chunk_size=1024):
+                    buffer += chunk
+                    while "data: " in buffer:
+                        idx = buffer.find("data: ")
+                        end_idx = buffer.find("\n\n", idx)
+                        if end_idx == -1:
+                            break
+                        json_str = buffer[idx + 6:end_idx].strip()
+                        buffer = buffer[end_idx + 2:]
+                        if json_str == "[DONE]":
+                            return
+                        try:
+                            data = json.loads(json_str)
+                            if data.get("choices"):
+                                delta = data["choices"][0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            print(f"本地API流式调用失败: {e}")
+            yield "抱歉，我暂时无法处理您的请求，请稍后再试。"
     
     def _get_system_prompt(self) -> str:
         """获取系统提示词"""
@@ -198,5 +326,4 @@ class ModelEngine:
         return self.token_usage.get(user_id)
 
 
-# 全局模型引擎实例
 model_engine = ModelEngine()

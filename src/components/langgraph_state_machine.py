@@ -1,5 +1,5 @@
 """基于LangGraph的状态机引擎"""
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Generator
 from enum import Enum
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
@@ -16,7 +16,7 @@ class State(Enum):
     DONE = "DONE"
     ERROR = "ERROR"
 
-def create_initial_state(user_input: str = "", user_id: str = "", session_id: str = "") -> Dict[str, Any]:
+def create_initial_state(user_input: str = "", user_id: str = "", session_id: str = "", stream: bool = False) -> Dict[str, Any]:
     """创建初始状态字典"""
     return {
         "user_input": user_input,
@@ -34,7 +34,8 @@ def create_initial_state(user_input: str = "", user_id: str = "", session_id: st
         "answer_generated": False,
         "retrieval_error": False,
         "generation_error": False,
-        "tool_error": False
+        "tool_error": False,
+        "stream": stream
     }
 
 
@@ -50,7 +51,6 @@ class LangGraphStateMachine:
         """构建工作流图"""
         workflow = StateGraph(dict)
         
-        # 添加节点（状态）
         workflow.add_node(State.INIT.value, self._init_node)
         workflow.add_node(State.UNDERSTAND.value, self._understand_node)
         workflow.add_node(State.RETRIEVING.value, self._retrieving_node)
@@ -60,13 +60,10 @@ class LangGraphStateMachine:
         workflow.add_node(State.DONE.value, self._done_node)
         workflow.add_node(State.ERROR.value, self._error_node)
         
-        # 添加边（状态转换）
         workflow.set_entry_point(State.INIT.value)
         
-        # INIT -> UNDERSTAND
         workflow.add_edge(State.INIT.value, State.UNDERSTAND.value)
         
-        # UNDERSTAND -> 多种可能
         workflow.add_conditional_edges(
             State.UNDERSTAND.value,
             self._decide_next_step,
@@ -79,7 +76,6 @@ class LangGraphStateMachine:
             }
         )
         
-        # RETRIEVING -> GENERATING 或 ERROR
         workflow.add_conditional_edges(
             State.RETRIEVING.value,
             self._check_retrieval_result,
@@ -89,7 +85,6 @@ class LangGraphStateMachine:
             }
         )
         
-        # TOOL_CALL -> GENERATING, WAIT_USER, 或 ERROR
         workflow.add_conditional_edges(
             State.TOOL_CALL.value,
             self._check_tool_result,
@@ -100,10 +95,8 @@ class LangGraphStateMachine:
             }
         )
         
-        # WAIT_USER -> UNDERSTAND
         workflow.add_edge(State.WAIT_USER.value, State.UNDERSTAND.value)
         
-        # GENERATING -> DONE 或 ERROR
         workflow.add_conditional_edges(
             State.GENERATING.value,
             self._check_generation_result,
@@ -113,10 +106,8 @@ class LangGraphStateMachine:
             }
         )
         
-        # DONE -> END
         workflow.add_edge(State.DONE.value, END)
         
-        # ERROR -> END
         workflow.add_edge(State.ERROR.value, END)
         
         return workflow
@@ -132,7 +123,6 @@ class LangGraphStateMachine:
         
         user_input = state.get("user_input", "")
         
-        # 检测多模态输入（图片）- 完全禁用RAG检索
         if "【图片" in user_input or "图片内容" in user_input:
             print(f"[状态机] 检测到多模态输入，跳过RAG检索")
             state["needs_retrieval"] = False
@@ -140,7 +130,6 @@ class LangGraphStateMachine:
             state["needs_clarification"] = False
             return state
         
-        # 简单的意图判断逻辑
         if "天气" in user_input or "气温" in user_input:
             state["needs_tool"] = True
         elif "师傅" in user_input or "老师" in user_input:
@@ -171,12 +160,10 @@ class LangGraphStateMachine:
             from src.rag.retriever import retriever
             from src.rag.reranker import reranker
             
-            # 执行检索
             retrieved_docs = retriever.retrieve(state.get("user_input", ""), k=3)
             print(f"[状态机] 检索到 {len(retrieved_docs)} 个文档")
             
             if retrieved_docs:
-                # 执行重排
                 reranked_docs = reranker.rerank(state.get("user_input", ""), retrieved_docs, top_k=3)
                 state["retrieved_docs"] = reranked_docs
                 state["retrieval_error"] = False
@@ -204,7 +191,6 @@ class LangGraphStateMachine:
         try:
             from src.tools import tool_executor
             
-            # 简单的工具调用示例
             tool_result = {
                 "tool": "get_weather",
                 "result": "模拟天气数据：晴，25度"
@@ -240,30 +226,32 @@ class LangGraphStateMachine:
             from src.rag.prompt_builder import prompt_builder
             
             user_input = state.get("user_input", "")
+            stream = state.get("stream", False)
             
-            # 检测多模态输入（图片）- 直接回答，不使用RAG
             if "【图片" in user_input or "图片内容" in user_input:
                 print(f"[状态机] 多模态输入，直接生成回答")
-                # 直接使用用户输入作为提示词，不添加RAG文档
                 prompt = f"""请根据用户提供的图片内容回答问题：
 
 {user_input}
 
 请提供详细、准确的回答。"""
             else:
-                # 构建RAG提示词
                 prompt = prompt_builder.build_prompt(user_input, state.get("retrieved_docs", []))
             
-            # 调用模型
             request = {
                 "model": "local_api",
                 "messages": [{"role": "user", "content": prompt}],
-                "stream": False,
+                "stream": stream,
                 "user_id": state.get("user_id", "unknown")
             }
             
             response = model_engine.generate(request)
-            state["answer"] = response.get("content", "")
+            
+            if stream and response.get("stream"):
+                state["answer"] = response.get("content", "")
+            else:
+                state["answer"] = response.get("content", "")
+            
             state["answer_generated"] = True
             state["generation_error"] = False
             
@@ -294,12 +282,10 @@ class LangGraphStateMachine:
             state["answer"] = "抱歉，处理过程中遇到了问题，请稍后重试。"
         return state
     
-    def run(self, user_input: str, user_id: str = "unknown", session_id: str = "default") -> Dict[str, Any]:
+    def run(self, user_input: str, user_id: str = "unknown", session_id: str = "default", stream: bool = False) -> Dict[str, Any]:
         """运行状态机"""
-        # 准备初始状态（字典格式）
-        initial_state = create_initial_state(user_input, user_id, session_id)
+        initial_state = create_initial_state(user_input, user_id, session_id, stream)
         
-        # 执行工作流
         config = {"configurable": {"thread_id": session_id}}
         
         try:
@@ -314,7 +300,8 @@ class LangGraphStateMachine:
                     "answer": last_state.get("answer", ""),
                     "error_message": last_state.get("error_message", ""),
                     "retrieved_docs": last_state.get("retrieved_docs", []),
-                    "tool_result": last_state.get("tool_result", {})
+                    "tool_result": last_state.get("tool_result", {}),
+                    "stream": stream
                 }
             
             return {"status": "error", "answer": "执行失败"}
@@ -322,6 +309,56 @@ class LangGraphStateMachine:
         except Exception as e:
             print(f"[状态机] 运行失败: {e}")
             return {"status": "error", "answer": f"执行失败: {str(e)}"}
+    
+    def run_stream(self, user_input: str, user_id: str = "unknown", session_id: str = "default") -> Generator[str, None, None]:
+        """流式运行状态机"""
+        from src.agent.model_engine import model_engine
+        from src.rag.prompt_builder import prompt_builder
+        
+        print(f"[状态机] 流式输出模式")
+        
+        try:
+            if "【图片" in user_input or "图片内容" in user_input:
+                prompt = f"""请根据用户提供的图片内容回答问题：
+
+{user_input}
+
+请提供详细、准确的回答。"""
+            else:
+                try:
+                    from src.rag.retriever import retriever
+                    from src.rag.reranker import reranker
+                    
+                    retrieved_docs = retriever.retrieve(user_input, k=3)
+                    if retrieved_docs:
+                        reranked_docs = reranker.rerank(user_input, retrieved_docs, top_k=3)
+                        prompt = prompt_builder.build_prompt(user_input, reranked_docs)
+                    else:
+                        prompt = f"""请回答用户的问题：
+
+{user_input}
+
+请提供准确、有用的回答。"""
+                except Exception as e:
+                    print(f"[状态机] RAG检索失败，使用直接回答: {e}")
+                    prompt = f"""请回答用户的问题：
+
+{user_input}
+
+请提供准确、有用的回答。"""
+            
+            request = {
+                "model": "local_api",
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": True,
+                "user_id": user_id
+            }
+            
+            yield from model_engine.generate_stream(request)
+            
+        except Exception as e:
+            print(f"[状态机] 流式运行失败: {e}")
+            yield f"执行失败: {str(e)}"
     
     def get_state_history(self, session_id: str) -> Optional[List[str]]:
         """获取状态历史"""
@@ -338,5 +375,4 @@ class LangGraphStateMachine:
         self.app = self.workflow.compile(checkpointer=self.checkpointer)
 
 
-# 全局LangGraph状态机实例
 langgraph_state_machine = LangGraphStateMachine()

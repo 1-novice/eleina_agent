@@ -1,0 +1,4 @@
+API Key: sk-d67d72c
+DashScope SDK导入成功
+下载测试图片: https://neeko-copilot.bytedance.net/api/text2image?prompt=anime%20girl%20portrait&image_size=square
+请求错误: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))

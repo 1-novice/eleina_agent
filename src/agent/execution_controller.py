@@ -11,7 +11,6 @@ from src.tools import tool_registry, tool_selector, param_parser, tool_executor,
 from src.skill import intent_registry as skill_intent_registry, intent_recognizer, skill_orchestrator, slot_filling, skill_tool_router, skill_state_manager
 from src.config.config import settings
 
-# 导入状态管理组件 - 使用LangGraph状态机
 from src.components import (
     session_manager,
     langgraph_state_machine,
@@ -30,11 +29,11 @@ class ExecutionController:
         """执行用户请求 - 使用LangGraph状态机"""
         user_id = context.get("user_id", "unknown")
         session_id = context.get("session_id", "default")
+        stream = context.get("stream", False)
         
         print(f"[执行控制器] 开始处理请求")
         
-        # 使用LangGraph状态机执行
-        result = langgraph_state_machine.run(user_input, user_id, session_id)
+        result = langgraph_state_machine.run(user_input, user_id, session_id, stream)
         
         if result is None:
             return {"status": "error", "message": "状态机执行失败"}
@@ -44,7 +43,8 @@ class ExecutionController:
                 "status": "completed",
                 "answer": result.get("answer", ""),
                 "rag_result": result,
-                "usage": {}
+                "usage": {},
+                "stream": stream
             }
         elif result.get("status") == "error":
             return {
@@ -54,12 +54,20 @@ class ExecutionController:
         
         return result
     
+    def execute_stream(self, user_input: str, context: Dict[str, Any]) -> Generator[str, None, None]:
+        """流式执行用户请求"""
+        user_id = context.get("user_id", "unknown")
+        session_id = context.get("session_id", "default")
+        
+        print(f"[执行控制器] 开始流式处理请求")
+        
+        yield from langgraph_state_machine.run_stream(user_input, user_id, session_id)
+    
     def _execute_multistep(self, plan: List[Dict[str, Any]], context: Dict[str, Any]) -> Dict[str, Any]:
         """执行多步任务 - 使用TaskProgressManager"""
         user_id = context.get("user_id", "unknown")
         session_id = context.get("session_id", "default")
         
-        # 创建任务
         task_id = task_progress_manager.create_task(
             intent="multistep_task",
             slots={"plan": plan},
@@ -397,5 +405,4 @@ class ExecutionController:
         return result
 
 
-# 全局执行控制器实例
 execution_controller = ExecutionController()
