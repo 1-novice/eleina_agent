@@ -132,6 +132,14 @@ class LangGraphStateMachine:
         
         user_input = state.get("user_input", "")
         
+        # 检测多模态输入（图片）- 完全禁用RAG检索
+        if "【图片" in user_input or "图片内容" in user_input:
+            print(f"[状态机] 检测到多模态输入，跳过RAG检索")
+            state["needs_retrieval"] = False
+            state["needs_tool"] = False
+            state["needs_clarification"] = False
+            return state
+        
         # 简单的意图判断逻辑
         if "天气" in user_input or "气温" in user_input:
             state["needs_tool"] = True
@@ -231,8 +239,20 @@ class LangGraphStateMachine:
             from src.agent.model_engine import model_engine
             from src.rag.prompt_builder import prompt_builder
             
-            # 构建提示词
-            prompt = prompt_builder.build_prompt(state.get("user_input", ""), state.get("retrieved_docs", []))
+            user_input = state.get("user_input", "")
+            
+            # 检测多模态输入（图片）- 直接回答，不使用RAG
+            if "【图片" in user_input or "图片内容" in user_input:
+                print(f"[状态机] 多模态输入，直接生成回答")
+                # 直接使用用户输入作为提示词，不添加RAG文档
+                prompt = f"""请根据用户提供的图片内容回答问题：
+
+{user_input}
+
+请提供详细、准确的回答。"""
+            else:
+                # 构建RAG提示词
+                prompt = prompt_builder.build_prompt(user_input, state.get("retrieved_docs", []))
             
             # 调用模型
             request = {

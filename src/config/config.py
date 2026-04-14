@@ -15,9 +15,9 @@ class Settings:
         # API Keys
         self.openai_api_key = os.getenv('OPENAI_API_KEY', None)
         # 支持DASHSCOPE_API_KEY或QIANWEN_API_KEY（兼容旧配置）
-        self.dashscope_api_key = os.getenv('sk-d67d72c8791845df961e722ad90ebcf3') or os.getenv('sk-d67d72c8791845df961e722ad90ebcf3', None)
+        self.dashscope_api_key = os.getenv('DASHSCOPE_API_KEY') or os.getenv('QIANWEN_API_KEY', None)
         self.baidu_api_key = os.getenv('BAIDU_API_KEY', None)
-        self.qianwen_api_key = os.getenv('QIANWEN_API_KEY', 'sk-d67d72c8791845df961e722ad90ebcf3')
+        self.qianwen_api_key = os.getenv('QIANWEN_API_KEY', None)
         
         # Vector Database
         self.vector_db_type = os.getenv('VECTOR_DB_TYPE', "chromadb")

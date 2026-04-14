@@ -620,6 +620,27 @@ test = ["certifi (>=2024)", "cryptography-vectors (==46.0.7)", "pretend (>=0.7)"
 test-randomorder = ["pytest-randomly"]
 
 [[package]]
+name = "dashscope"
+version = "1.25.16"
+description = "dashscope client sdk library"
+optional = false
+python-versions = ">=3.8.0"
+groups = ["main"]
+files = [
+    {file = "dashscope-1.25.16-py3-none-any.whl", hash = "sha256:85d26bdc5faaaa8ba42a9478e48f4ddf917d670be3400ded60c82f57b931694d"},
+]
+
+[package.dependencies]
+aiohttp = "*"
+certifi = "*"
+cryptography = "*"
+requests = "*"
+websocket-client = "*"
+
+[package.extras]
+tokenizer = ["tiktoken"]
+
+[[package]]
 name = "dataclasses-json"
 version = "0.6.7"
 description = "Easily serialize dataclasses to and from JSON."
@@ -3112,6 +3133,23 @@ socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 
 [[package]]
+name = "websocket-client"
+version = "1.9.0"
+description = "WebSocket client for Python with low level API options"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "websocket_client-1.9.0-py3-none-any.whl", hash = "sha256:af248a825037ef591efbf6ed20cc5faa03d3b47b9e5a2230a529eeee1c1fc3ef"},
+    {file = "websocket_client-1.9.0.tar.gz", hash = "sha256:9e813624b6eb619999a97dc7958469217c3176312b3a16a4bd1bc7e08a46ec98"},
+]
+
+[package.extras]
+docs = ["Sphinx (>=6.0)", "myst-parser (>=2.0.0)", "sphinx_rtd_theme (>=1.1.0)"]
+optional = ["python-socks", "wsaccel"]
+test = ["pytest", "websockets"]
+
+[[package]]
 name = "yarl"
 version = "1.23.0"
 description = "Yet another URL library"
@@ -3257,4 +3295,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "8bb9869668b948889d81c8697dae4707b0e60972b6f53fc03f649bdd74302d69"
+content-hash = "bf8104c8dee91bbf052141d57757ff58c01f694c307a8a8678b17acb5d9266fb"
