@@ -16,13 +16,14 @@ class State(Enum):
     DONE = "DONE"
     ERROR = "ERROR"
 
-def create_initial_state(user_input: str = "", user_id: str = "", session_id: str = "", stream: bool = False) -> Dict[str, Any]:
+def create_initial_state(user_input: str = "", user_id: str = "", session_id: str = "", stream: bool = False, context_memory: str = "") -> Dict[str, Any]:
     """创建初始状态字典"""
     return {
         "user_input": user_input,
         "user_id": user_id,
         "session_id": session_id,
         "context": "",
+        "context_memory": context_memory,
         "retrieved_docs": [],
         "tool_result": {},
         "answer": "",
@@ -227,6 +228,7 @@ class LangGraphStateMachine:
             
             user_input = state.get("user_input", "")
             stream = state.get("stream", False)
+            context_memory = state.get("context_memory", "")
             
             if "【图片" in user_input or "图片内容" in user_input:
                 print(f"[状态机] 多模态输入，直接生成回答")
@@ -238,9 +240,18 @@ class LangGraphStateMachine:
             else:
                 prompt = prompt_builder.build_prompt(user_input, state.get("retrieved_docs", []))
             
+            if context_memory:
+                full_prompt = f"""以下是对话历史：
+
+{context_memory}
+
+当前问题：{prompt}"""
+            else:
+                full_prompt = prompt
+            
             request = {
                 "model": "local_api",
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": [{"role": "user", "content": full_prompt}],
                 "stream": stream,
                 "user_id": state.get("user_id", "unknown")
             }
@@ -282,9 +293,9 @@ class LangGraphStateMachine:
             state["answer"] = "抱歉，处理过程中遇到了问题，请稍后重试。"
         return state
     
-    def run(self, user_input: str, user_id: str = "unknown", session_id: str = "default", stream: bool = False) -> Dict[str, Any]:
+    def run(self, user_input: str, user_id: str = "unknown", session_id: str = "default", stream: bool = False, context_memory: str = "") -> Dict[str, Any]:
         """运行状态机"""
-        initial_state = create_initial_state(user_input, user_id, session_id, stream)
+        initial_state = create_initial_state(user_input, user_id, session_id, stream, context_memory)
         
         config = {"configurable": {"thread_id": session_id}}
         
@@ -310,7 +321,7 @@ class LangGraphStateMachine:
             print(f"[状态机] 运行失败: {e}")
             return {"status": "error", "answer": f"执行失败: {str(e)}"}
     
-    def run_stream(self, user_input: str, user_id: str = "unknown", session_id: str = "default") -> Generator[str, None, None]:
+    def run_stream(self, user_input: str, user_id: str = "unknown", session_id: str = "default", context_memory: str = "") -> Generator[str, None, None]:
         """流式运行状态机"""
         from src.agent.model_engine import model_engine
         from src.rag.prompt_builder import prompt_builder
@@ -329,10 +340,18 @@ class LangGraphStateMachine:
                     from src.rag.retriever import retriever
                     from src.rag.reranker import reranker
                     
-                    retrieved_docs = retriever.retrieve(user_input, k=3)
-                    if retrieved_docs:
-                        reranked_docs = reranker.rerank(user_input, retrieved_docs, top_k=3)
-                        prompt = prompt_builder.build_prompt(user_input, reranked_docs)
+                    retrieval_keywords = ["资料", "文档", "知识库", "查找", "搜索", "查询"]
+                    if any(k in user_input for k in retrieval_keywords):
+                        retrieved_docs = retriever.retrieve(user_input, k=3)
+                        if retrieved_docs:
+                            reranked_docs = reranker.rerank(user_input, retrieved_docs, top_k=3)
+                            prompt = prompt_builder.build_prompt(user_input, reranked_docs)
+                        else:
+                            prompt = f"""请回答用户的问题：
+
+{user_input}
+
+请提供准确、有用的回答。"""
                     else:
                         prompt = f"""请回答用户的问题：
 
@@ -347,9 +366,18 @@ class LangGraphStateMachine:
 
 请提供准确、有用的回答。"""
             
+            if context_memory:
+                full_prompt = f"""以下是对话历史：
+
+{context_memory}
+
+当前问题：{prompt}"""
+            else:
+                full_prompt = prompt
+            
             request = {
                 "model": "local_api",
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": [{"role": "user", "content": full_prompt}],
                 "stream": True,
                 "user_id": user_id
             }

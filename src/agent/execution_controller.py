@@ -10,6 +10,7 @@ from src.agent.reasoning_engine import reasoning_engine
 from src.tools import tool_registry, tool_selector, param_parser, tool_executor, result_formatter, security_gateway, tool_callback
 from src.skill import intent_registry as skill_intent_registry, intent_recognizer, skill_orchestrator, slot_filling, skill_tool_router, skill_state_manager
 from src.config.config import settings
+from src.memory.memory_manager import memory_manager
 
 from src.components import (
     session_manager,
@@ -33,7 +34,13 @@ class ExecutionController:
         
         print(f"[执行控制器] 开始处理请求")
         
-        result = langgraph_state_machine.run(user_input, user_id, session_id, stream)
+        context_memory = memory_manager.get_context_memory(user_id, session_id, max_turns=5)
+        
+        result = langgraph_state_machine.run(user_input, user_id, session_id, stream, context_memory)
+        
+        if result.get("answer"):
+            memory_manager.writer.write_dialog_memory(session_id, "user", user_input)
+            memory_manager.writer.write_dialog_memory(session_id, "assistant", result["answer"])
         
         if result is None:
             return {"status": "error", "message": "状态机执行失败"}
@@ -61,7 +68,16 @@ class ExecutionController:
         
         print(f"[执行控制器] 开始流式处理请求")
         
-        yield from langgraph_state_machine.run_stream(user_input, user_id, session_id)
+        context_memory = memory_manager.get_context_memory(user_id, session_id, max_turns=5)
+        
+        full_answer = ""
+        for chunk in langgraph_state_machine.run_stream(user_input, user_id, session_id, context_memory):
+            full_answer += chunk
+            yield chunk
+        
+        if full_answer:
+            memory_manager.writer.write_dialog_memory(session_id, "user", user_input)
+            memory_manager.writer.write_dialog_memory(session_id, "assistant", full_answer)
     
     def _execute_multistep(self, plan: List[Dict[str, Any]], context: Dict[str, Any]) -> Dict[str, Any]:
         """执行多步任务 - 使用TaskProgressManager"""

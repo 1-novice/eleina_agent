@@ -57,5 +57,41 @@
     "resumed_at": "2026-04-11T22:46:05.469337",
     "paused_reason": "user_request",
     "archived_at": "2026-04-11T22:46:05.469337"
+  },
+  "156ffc95-2565-4aa9-b9f3-828e07c3602c": {
+    "session_id": "156ffc95-2565-4aa9-b9f3-828e07c3602c",
+    "user_id": "default_user",
+    "created_at": "2026-04-15T22:39:32.664741",
+    "last_active": "2026-04-15T22:42:03.910824",
+    "status": "archived",
+    "context": [
+      {
+        "role": "user",
+        "content": "你最喜欢的事情什么",
+        "timestamp": "2024-01-01T00:00:00"
+      },
+      {
+        "role": "assistant",
+        "content": "亲爱的旅者，我最喜欢的事情莫过于探索这个世界的每一个角落，记录下我所遇见的奇遇与故事。在旅途中，我格外钟爱葡萄面包，它是我旅途中的常备食物。同时，我珍视那些温柔、真诚、善良的人与事物，他们的存在给予我无比的温暖与力量。",
+        "timestamp": "2024-01-01T00:00:01"
+      },
+      {
+        "role": "user",
+        "content": "我刚才问了你什么问题",
+        "timestamp": "2024-01-01T00:00:00"
+      },
+      {
+        "role": "assistant",
+        "content": "亲爱的旅者，您刚才询问我最喜欢的事情是什么。根据我的回答，您似乎对我的答案不太满意，想要再次确认。",
+        "timestamp": "2024-01-01T00:00:01"
+      }
+    ],
+    "task_info": null,
+    "metadata": {
+      "device": "terminal",
+      "source": "cli",
+      "ip": "unknown"
+    },
+    "archived_at": "2026-04-15T22:43:57.916165"
   }
 }
