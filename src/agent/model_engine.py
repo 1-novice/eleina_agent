@@ -47,15 +47,16 @@ class ModelEngine:
         messages = request.get("messages", [])
         stream = request.get("stream", False)
         user_id = request.get("user_id", "unknown")
+        add_system_prompt = request.get("add_system_prompt", True)
         
         try:
             if model_name not in self.models:
                 raise ValueError(f"模型 {model_name} 未初始化")
             
             if stream:
-                return self._generate_local_api_stream(messages, user_id)
+                return self._generate_local_api_stream(messages, user_id, add_system_prompt)
             else:
-                return self._generate_local_api(messages, stream, user_id)
+                return self._generate_local_api(messages, stream, user_id, add_system_prompt)
         except Exception as e:
             print(f"模型生成失败: {e}")
             return {
@@ -73,17 +74,18 @@ class ModelEngine:
         model_name = request.get("model", settings.model_type)
         messages = request.get("messages", [])
         user_id = request.get("user_id", "unknown")
+        add_system_prompt = request.get("add_system_prompt", True)
         
         try:
             if model_name not in self.models:
                 raise ValueError(f"模型 {model_name} 未初始化")
             
-            yield from self._stream_local_api(messages, user_id)
+            yield from self._stream_local_api(messages, user_id, add_system_prompt)
         except Exception as e:
             print(f"流式生成失败: {e}")
             yield "抱歉，我暂时无法处理您的请求，请稍后再试。"
     
-    def _generate_local_api(self, messages: List[Dict[str, str]], stream: bool, user_id: str) -> Dict[str, Any]:
+    def _generate_local_api(self, messages: List[Dict[str, str]], stream: bool, user_id: str, add_system_prompt: bool = True) -> Dict[str, Any]:
         """使用本地API生成响应"""
         import time
         start_time = time.time()
@@ -95,14 +97,17 @@ class ModelEngine:
                 raise ValueError("本地API客户端未初始化")
             
             api_path = settings.local_api_url.rstrip('/')
-            system_prompt = self._get_system_prompt()
             
-            full_messages = [
-                {
-                    "role": "system",
-                    "content": system_prompt
-                }
-            ] + messages
+            if add_system_prompt:
+                system_prompt = self._get_system_prompt()
+                full_messages = [
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    }
+                ] + messages
+            else:
+                full_messages = messages
             
             api_request = {
                 "model": "qwen2.5-7b-instruct",
@@ -113,7 +118,7 @@ class ModelEngine:
                 "max_tokens": 1024
             }
             
-            print(f"[大模型调用] 用户: {user_id}, 消息数: {len(messages)}, 接口: {api_path}")
+            print(f"[大模型调用] 用户: {user_id}, 消息数: {len(messages)}, 接口: {api_path}, add_system_prompt: {add_system_prompt}")
             
             if has_httpx and isinstance(client, httpx.Client):
                 print(f"[大模型调用] 开始发送HTTP请求...")
@@ -165,7 +170,7 @@ class ModelEngine:
                 "finish_reason": "error"
             }
     
-    def _generate_local_api_stream(self, messages: List[Dict[str, str]], user_id: str) -> Dict[str, Any]:
+    def _generate_local_api_stream(self, messages: List[Dict[str, str]], user_id: str, add_system_prompt: bool = True) -> Dict[str, Any]:
         """使用本地API流式生成响应"""
         try:
             model_info = self.models["local_api"]
@@ -175,14 +180,17 @@ class ModelEngine:
                 raise ValueError("流式输出需要httpx客户端")
             
             api_path = settings.local_api_url.rstrip('/')
-            system_prompt = self._get_system_prompt()
             
-            full_messages = [
-                {
-                    "role": "system",
-                    "content": system_prompt
-                }
-            ] + messages
+            if add_system_prompt:
+                system_prompt = self._get_system_prompt()
+                full_messages = [
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    }
+                ] + messages
+            else:
+                full_messages = messages
             
             api_request = {
                 "model": "qwen2.5-7b-instruct",
@@ -193,14 +201,17 @@ class ModelEngine:
                 "max_tokens": 1024
             }
             
-            print(f"[大模型调用] 流式输出 - 用户: {user_id}, 消息数: {len(messages)}")
+            print(f"[大模型调用] 流式输出 - 用户: {user_id}, 消息数: {len(messages)}, add_system_prompt: {add_system_prompt}")
             
             def stream_generator():
-                with client.stream("POST", "", json=api_request, follow_redirects=True) as response:
+                import asyncio
+                with client.stream("POST", "", json=api_request, follow_redirects=True, timeout=httpx.Timeout(600.0)) as response:
                     response.raise_for_status()
                     buffer = ""
-                    for chunk in response.iter_text(chunk_size=1024):
-                        buffer += chunk
+                    # 使用更小的chunk_size并禁用缓冲
+                    for chunk in response.iter_bytes(chunk_size=64):
+                        buffer += chunk.decode('utf-8')
+                        # 立即处理可用的数据
                         while "data: " in buffer:
                             idx = buffer.find("data: ")
                             end_idx = buffer.find("\n\n", idx)
@@ -216,6 +227,7 @@ class ModelEngine:
                                     delta = data["choices"][0].get("delta", {})
                                     content = delta.get("content", "")
                                     if content:
+                                        # 立即yield，不延迟
                                         yield content
                             except json.JSONDecodeError:
                                 continue
@@ -240,7 +252,7 @@ class ModelEngine:
                 "stream": False
             }
     
-    def _stream_local_api(self, messages: List[Dict[str, str]], user_id: str) -> Generator[str, None, None]:
+    def _stream_local_api(self, messages: List[Dict[str, str]], user_id: str, add_system_prompt: bool = True) -> Generator[str, None, None]:
         """使用本地API流式生成响应（直接返回生成器）"""
         try:
             model_info = self.models["local_api"]
@@ -250,14 +262,17 @@ class ModelEngine:
                 raise ValueError("流式输出需要httpx客户端")
             
             api_path = settings.local_api_url.rstrip('/')
-            system_prompt = self._get_system_prompt()
             
-            full_messages = [
-                {
-                    "role": "system",
-                    "content": system_prompt
-                }
-            ] + messages
+            if add_system_prompt:
+                system_prompt = self._get_system_prompt()
+                full_messages = [
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    }
+                ] + messages
+            else:
+                full_messages = messages
             
             api_request = {
                 "model": "qwen2.5-7b-instruct",
@@ -268,7 +283,7 @@ class ModelEngine:
                 "max_tokens": 1024
             }
             
-            print(f"[大模型调用] 流式输出 - 用户: {user_id}, 消息数: {len(messages)}")
+            print(f"[大模型调用] 流式输出 - 用户: {user_id}, 消息数: {len(messages)}, add_system_prompt: {add_system_prompt}")
             
             with client.stream("POST", "", json=api_request, follow_redirects=True) as response:
                 response.raise_for_status()
@@ -302,6 +317,9 @@ class ModelEngine:
         try:
             with open("src/prompt/system_prompt.txt", "r", encoding="utf-8") as f:
                 system_prompt = f.read().strip()
+            
+            # 移除特殊标记
+            system_prompt = system_prompt.replace("<|im_start|>system", "").replace("<|im_end|>", "").strip()
         except Exception:
             system_prompt = "你是一个全能的智能体动漫角色，具有丰富的知识和强大的能力。"
         return system_prompt

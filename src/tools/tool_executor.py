@@ -40,6 +40,8 @@ class ToolExecutor:
                 result = self._execute_run_python(params, timeout)
             elif tool_name == "run_shell":
                 result = self._execute_run_shell(params, timeout)
+            elif tool_name == "generate_image":
+                result = self._execute_generate_image(params)
             else:
                 # 执行自定义工具
                 result = self._execute_custom_tool(tool_name, params)
@@ -327,6 +329,164 @@ class ToolExecutor:
             "message": f"执行自定义工具 {tool_name}",
             "params": params
         }
+    
+    def _execute_generate_image(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """执行图片生成工具 - 使用 wan2.7-image 模型（官方SDK调用方式）"""
+        import os
+        import time
+        
+        api_key = os.getenv("DASHSCOPE_API_KEY")
+        if not api_key:
+            return {
+                "status": "error",
+                "message": "未配置DASHSCOPE_API_KEY环境变量",
+                "prompt": params.get("prompt", ""),
+                "size": params.get("size", "1024*1024"),
+                "n": params.get("n", 1)
+            }
+        
+        try:
+            import dashscope
+            from dashscope.aigc.image_generation import ImageGeneration
+            from dashscope.api_entities.dashscope_response import Message
+        except ImportError as e:
+            return {
+                "status": "error",
+                "message": f"缺少依赖，请安装: pip install dashscope",
+                "prompt": params.get("prompt", ""),
+                "size": params.get("size", "1024*1024"),
+                "n": params.get("n", 1),
+                "error_detail": str(e)
+            }
+        
+        dashscope.base_http_api_url = 'https://dashscope.aliyuncs.com/api/v1'
+        
+        prompt = params.get("prompt", "")
+        size = params.get("size", "1024*1024")
+        n = int(params.get("n", 1))
+        
+        if not prompt:
+            return {
+                "status": "error",
+                "message": "图片描述(prompt)不能为空",
+                "prompt": prompt,
+                "size": size,
+                "n": n
+            }
+        
+        if 'x' in size:
+            size = size.replace('x', '*')
+        
+        start_time = time.time()
+        
+        try:
+            print(f"[图片生成工具] 调用 wan2.7-image API")
+            print(f"[图片生成工具] 参数: prompt={prompt[:50]}..., size={size}, n={n}")
+            
+            message = Message(
+                role="user",
+                content=[
+                    {
+                        "text": prompt
+                    }
+                ]
+            )
+            
+            rsp = ImageGeneration.call(
+                model='wan2.7-image',
+                api_key=api_key,
+                messages=[message],
+                n=n,
+                size=size
+            )
+            
+            elapsed_time = time.time() - start_time
+            print(f"[图片生成工具] 调用完成，耗时: {elapsed_time:.2f}秒")
+            print(f"[图片生成工具] 响应: {rsp}")
+            
+            if rsp.status_code == 200:
+                output = rsp.output
+                if isinstance(output, dict) and 'choices' in output and output['choices']:
+                    choice = output['choices'][0]
+                    if isinstance(choice, dict) and 'message' in choice and 'content' in choice['message']:
+                        content = choice['message']['content']
+                        urls = []
+                        for item in content:
+                            if isinstance(item, dict) and 'image' in item and item['image']:
+                                urls.append(item['image'])
+                        if urls:
+                            result = {
+                                "status": "success",
+                                "url": urls[0],
+                                "urls": urls,
+                                "prompt": prompt,
+                                "size": size,
+                                "n": n,
+                                "message": f"成功生成{n}张图片，图片URL: {urls[0]}",
+                                "elapsed_time": round(elapsed_time, 2),
+                                "detailed_info": f"图片生成成功！\nURL: {urls[0]}\n描述: {prompt}\n尺寸: {size}\n数量: {n}"
+                            }
+                            print(f"[图片生成工具] 成功: {urls[0]}")
+                            return result
+                elif hasattr(output, 'choices') and output.choices:
+                    choice = output.choices[0]
+                    if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
+                        content = choice.message.content
+                        urls = []
+                        for item in content:
+                            if hasattr(item, 'image') and item.image:
+                                urls.append(item.image)
+                        if urls:
+                            result = {
+                                "status": "success",
+                                "url": urls[0],
+                                "urls": urls,
+                                "prompt": prompt,
+                                "size": size,
+                                "n": n,
+                                "message": f"成功生成{n}张图片，图片URL: {urls[0]}",
+                                "elapsed_time": round(elapsed_time, 2),
+                                "detailed_info": f"图片生成成功！\nURL: {urls[0]}\n描述: {prompt}\n尺寸: {size}\n数量: {n}"
+                            }
+                            print(f"[图片生成工具] 成功: {urls[0]}")
+                            return result
+            
+            error_msg = rsp.message if hasattr(rsp, 'message') and rsp.message else "图片生成失败"
+            print(f"[图片生成工具] 失败: {error_msg}")
+            return {
+                "status": "error",
+                "message": error_msg,
+                "prompt": prompt,
+                "size": size,
+                "n": n,
+                "elapsed_time": round(elapsed_time, 2),
+                "error_detail": str(rsp)
+            }
+                
+        except Exception as e:
+            elapsed_time = time.time() - start_time
+            print(f"[图片生成工具] 异常: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"图片生成异常: {str(e)}",
+                "prompt": prompt,
+                "size": size,
+                "n": n,
+                "elapsed_time": round(elapsed_time, 2),
+                "error_detail": str(e)
+            }
+    
+    def _validate_size(self, size: str) -> bool:
+        """验证图片尺寸格式
+        
+        Args:
+            size: 图片尺寸字符串
+            
+        Returns:
+            bool: 是否有效
+        """
+        valid_sizes = {"512*512", "1024*1024", "1024*1536", "1536*1024"}
+        return size in valid_sizes
 
 
 # 全局工具执行器实例

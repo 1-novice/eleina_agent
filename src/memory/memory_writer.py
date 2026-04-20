@@ -211,7 +211,9 @@ class MemoryWriter:
             "create_time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "expire_time": None
         }
-        return self.write_memory(memory)
+        result = self.write_memory(memory)
+        print(f"[记忆写入器] 写入对话: session_id={session_id}, role={role}, content={content[:20]}..., result={result}")
+        return result
     
     def write_task_memory(self, session_id: str, task: str, progress: str = "0%", steps: List[str] = None) -> bool:
         """写入任务记忆

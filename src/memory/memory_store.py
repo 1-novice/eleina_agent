@@ -250,6 +250,8 @@ class MemoryStore:
                 if session_id in self.in_memory_store["dialog_history"]:
                     history = self.in_memory_store["dialog_history"][session_id]
             
+            print(f"[存储] 获取对话历史: session_id={session_id}, 总数={len(history)}, 返回={len(history[-max_turns:])}")
+            
             # 返回最近的max_turns轮
             return history[-max_turns:]
         except Exception as e:

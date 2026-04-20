@@ -108,36 +108,45 @@ class MemoryManager:
             
             # 获取历史对话
             history = self.retriever.get_dialog_history(session_id, max_turns)
+            print(f"[记忆管理器] 获取到 {len(history)} 条历史对话")
+            if history:
+                print("[记忆管理器] 历史对话完整列表:")
+                for i, item in enumerate(history):
+                    print(f"  [{i}] role={item.get('role', '')}, content={item.get('content', '')[:50]}...")
+                print(f"[记忆管理器] 将排除最后 {1 if len(history) > 0 else 0} 条（当前用户输入）")
             
             # 格式化记忆
-            context = """
-【用户档案】
-"""
+            context_parts = []
             
-            if user_profile:
-                for item in user_profile:
-                    context += f"{item['key']}: {item['value']}\n"
-            
-            context += "\n【当前任务】\n"
-            if current_task:
-                context += f"{current_task.get('task', '无')}\n"
-                context += f"进度: {current_task.get('progress', '0%')}\n"
-            else:
-                context += "无\n"
-            
-            context += "\n【历史对话】\n"
-            if history:
-                for item in history:
+            # 添加历史对话（最重要，放在最前面）
+            if history and len(history) > 1:
+                context_parts.append("【历史对话】")
+                # 排除当前用户输入（最后一条），只保留真正的历史
+                for item in history[:-1]:
                     role = item.get('role', 'user')
                     content = item.get('content', '')
                     if role == 'user':
-                        context += f"用户: {content}\n"
+                        context_parts.append(f"用户: {content}")
                     elif role == 'assistant':
-                        context += f"助手: {content}\n"
-            else:
-                context += "无\n"
+                        context_parts.append(f"助手: {content}")
+                context_parts.append("")
             
-            return context
+            # 添加用户档案
+            if user_profile:
+                context_parts.append("【用户档案】")
+                for item in user_profile:
+                    context_parts.append(f"{item['key']}: {item['value']}")
+                context_parts.append("")
+            
+            # 添加当前任务
+            context_parts.append("【当前任务】")
+            if current_task:
+                context_parts.append(f"{current_task.get('task', '无')}")
+                context_parts.append(f"进度: {current_task.get('progress', '0%')}")
+            else:
+                context_parts.append("无")
+            
+            return "\n".join(context_parts)
         except Exception as e:
             print(f"获取上下文记忆失败: {e}")
             return ""

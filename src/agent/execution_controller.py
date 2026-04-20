@@ -34,12 +34,29 @@ class ExecutionController:
         
         print(f"[执行控制器] 开始处理请求")
         
-        context_memory = memory_manager.get_context_memory(user_id, session_id, max_turns=5)
+        # 如果前端传递了历史消息，使用它们构建上下文记忆
+        history_messages = context.get("history_messages", [])
+        if history_messages:
+            print(f"[执行控制器] 使用前端传递的 {len(history_messages)} 条历史消息")
+            context_memory_parts = ["【历史对话】"]
+            for msg in history_messages:
+                role = msg.get('role')
+                content = msg.get('content')
+                if role == 'user':
+                    context_memory_parts.append(f"用户: {content}")
+                elif role == 'assistant':
+                    context_memory_parts.append(f"助手: {content}")
+            context_memory = "\n".join(context_memory_parts)
+        else:
+            # 否则从内存中获取
+            context_memory = memory_manager.get_context_memory(user_id, session_id, max_turns=5)
+        
+        print(f"[执行控制器] 上下文记忆长度: {len(context_memory)}")
+        print(f"[执行控制器] 上下文记忆包含历史对话: {'历史对话' in context_memory}")
         
         result = langgraph_state_machine.run(user_input, user_id, session_id, stream, context_memory)
         
         if result.get("answer"):
-            memory_manager.writer.write_dialog_memory(session_id, "user", user_input)
             memory_manager.writer.write_dialog_memory(session_id, "assistant", result["answer"])
         
         if result is None:
@@ -66,9 +83,28 @@ class ExecutionController:
         user_id = context.get("user_id", "unknown")
         session_id = context.get("session_id", "default")
         
-        print(f"[执行控制器] 开始流式处理请求")
+        print(f"[执行控制器] 开始流式处理请求 - 已修复版本")
+        print(f"[执行控制器] 用户输入: {user_input}")
         
-        context_memory = memory_manager.get_context_memory(user_id, session_id, max_turns=5)
+        # 如果前端传递了历史消息，使用它们构建上下文记忆
+        history_messages = context.get("history_messages", [])
+        if history_messages:
+            print(f"[执行控制器] 使用前端传递的 {len(history_messages)} 条历史消息")
+            context_memory_parts = ["【历史对话】"]
+            for msg in history_messages:
+                role = msg.get('role')
+                content = msg.get('content')
+                if role == 'user':
+                    context_memory_parts.append(f"用户: {content}")
+                elif role == 'assistant':
+                    context_memory_parts.append(f"助手: {content}")
+            context_memory = "\n".join(context_memory_parts)
+        else:
+            # 否则从内存中获取
+            context_memory = memory_manager.get_context_memory(user_id, session_id, max_turns=5)
+        
+        print(f"[执行控制器] 上下文记忆长度: {len(context_memory)}")
+        print(f"[执行控制器] 上下文记忆包含历史对话: {'历史对话' in context_memory}")
         
         full_answer = ""
         for chunk in langgraph_state_machine.run_stream(user_input, user_id, session_id, context_memory):
@@ -76,7 +112,6 @@ class ExecutionController:
             yield chunk
         
         if full_answer:
-            memory_manager.writer.write_dialog_memory(session_id, "user", user_input)
             memory_manager.writer.write_dialog_memory(session_id, "assistant", full_answer)
     
     def _execute_multistep(self, plan: List[Dict[str, Any]], context: Dict[str, Any]) -> Dict[str, Any]:
