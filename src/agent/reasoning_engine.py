@@ -15,7 +15,7 @@ class ReasoningEngine:
             
             # 调用模型进行思考
             request = {
-                "model": settings.model_type,
+                "model": model_engine.current_model,
                 "messages": [
                     {
                         "role": "user",
@@ -113,7 +113,7 @@ class ReasoningEngine:
             
             # 调用模型生成规划
             request = {
-                "model": settings.model_type,
+                "model": model_engine.current_model,
                 "messages": [
                     {
                         "role": "user",
@@ -192,7 +192,7 @@ class ReasoningEngine:
             
             # 调用模型进行推理
             request = {
-                "model": settings.model_type,
+                "model": model_engine.current_model,
                 "messages": [
                     {
                         "role": "user",

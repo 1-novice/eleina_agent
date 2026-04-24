@@ -17,7 +17,11 @@ class Settings:
         # 支持DASHSCOPE_API_KEY或QIANWEN_API_KEY（兼容旧配置）
         self.dashscope_api_key = os.getenv('DASHSCOPE_API_KEY') or os.getenv('QIANWEN_API_KEY', None)
         self.baidu_api_key = os.getenv('BAIDU_API_KEY', None)
-        self.qianwen_api_key = os.getenv('QIANWEN_API_KEY', None)
+        self.qianwen_api_key = os.getenv('QIANWEN_API_KEY', None) or os.getenv('DASHSCOPE_API_KEY', None)
+        
+        # Qwen Plus Configuration
+        self.qwen_plus_api_url = os.getenv('QWEN_PLUS_API_URL', "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation")
+        self.qwen_plus_model = os.getenv('QWEN_PLUS_MODEL', "qwen-plus")
         
         # Vector Database
         self.vector_db_type = os.getenv('VECTOR_DB_TYPE', "chromadb")

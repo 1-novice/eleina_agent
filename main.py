@@ -8,6 +8,7 @@ from src.skill.cli_registrar import register_cli_intents
 from src.cli.interactive_cli import run_interactive_cli
 from src.api.app import run_api_server
 from src.config.config import settings
+from src.agent.model_engine import model_engine
 
 
 def main():
@@ -30,8 +31,20 @@ def main():
         default=settings.api_port,
         help="API服务端口"
     )
+    parser.add_argument(
+        "--use-qwen",
+        action="store_true",
+        default=False,
+        help="使用阿里千问 qwen-plus 模型（默认使用本地模型）"
+    )
     
     args = parser.parse_args()
+    
+    # 根据参数切换模型
+    if args.use_qwen:
+        model_engine.switch_model("qwen_plus")
+    else:
+        model_engine.switch_model("local_api")
     
     if args.mode == "api":
         start_api_server(args.host, args.port)
@@ -45,6 +58,7 @@ def start_cli():
     print("输入 'exit' 退出")
     print("输入 'status' 查看状态")
     print("输入 'reset' 重置会话")
+    print(f"当前模型: {model_engine.current_model}")
     
     register_cli_tools()
     register_cli_intents()
@@ -58,6 +72,7 @@ def start_api_server(host: str, port: int):
     print(f"服务地址: http://{host}:{port}")
     print(f"API文档: http://{host}:{port}/docs")
     print(f"API说明: http://{host}:{port}/redoc")
+    print(f"当前模型: {model_engine.current_model}")
     
     register_cli_tools()
     register_cli_intents()

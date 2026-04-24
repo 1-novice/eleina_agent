@@ -1,0 +1,113 @@
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: eleina-jaeger
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "14268:14268"
+      - "9411:9411"
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    networks:
+      - eleina-network
+    volumes:
+      - jaeger-data:/tmp/jaeger
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: eleina-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./configs/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    networks:
+      - eleina-network
+    depends_on:
+      - jaeger
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: eleina-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./configs/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager-data:/alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    networks:
+      - eleina-network
+    depends_on:
+      - prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: eleina-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./dashboards:/var/lib/grafana/dashboards
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - eleina-network
+    depends_on:
+      - prometheus
+      - jaeger
+
+  redis:
+    image: redis:latest
+    container_name: eleina-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - eleina-network
+    command: redis-server --appendonly yes
+
+  mysql:
+    image: mysql:8.0
+    container_name: eleina-mysql
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=eleina_root_pwd
+      - MYSQL_DATABASE=eleina_agent
+      - MYSQL_USER=eleina_user
+      - MYSQL_PASSWORD=eleina_pwd
+    networks:
+      - eleina-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  eleina-network:
+    driver: bridge
+
+volumes:
+  jaeger-data:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+  redis-data:
+  mysql-data:

@@ -1,0 +1,38 @@
+groups:
+  - name: eleina-agent.rules
+    rules:
+      - alert: AgentHighErrorRate
+        expr: rate(agent_request_total{status="error"}[5m]) / rate(agent_request_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Agent 错误率超过 5%"
+          description: "最近5分钟错误率: {{ $value }}"
+
+      - alert: AgentHighLatency
+        expr: histogram_quantile(0.95, sum(rate(agent_request_latency_seconds_bucket[5m])) by (le)) > 3
+        for: 1m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Agent P95 延迟超过 3s"
+          description: "P95延迟: {{ $value }}s"
+
+      - alert: AgentModelFailed
+        expr: agent_model_errors_total > 5
+        for: 1m
+        labels:
+          severity: P0
+        annotations:
+          summary: "模型连续失败超过5次"
+          description: "错误类型: {{ $labels.error_type }}"
+
+      - alert: AgentTokenSpike
+        expr: rate(agent_token_consumption[10m]) > 10000
+        for: 2m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Token 消耗突增"
+          description: "Token消耗速率: {{ $value }}/min"
