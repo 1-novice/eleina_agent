@@ -21,10 +21,52 @@ from src.components import (
     interrupt_controller
 )
 
+from src.rag.medical_domain_recognizer import medical_domain_recognizer
+from src.rag.medical_knowledge_manager import medical_knowledge_manager
+from src.rag.medical_retriever import medical_retriever
+from src.rag.medical_response_generator import medical_response_generator
+
 
 class ExecutionController:
     def __init__(self):
         pass
+    
+    def _detect_and_execute_medical_rag(self, user_input: str, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """检测用户问题是否属于医疗领域，并执行医疗RAG检索
+        
+        Returns:
+            如果是医疗问题且成功处理，返回处理结果；否则返回None
+        """
+        # 检测是否为医疗问题
+        is_medical, domain_name, confidence = medical_domain_recognizer.detect_medical_domain(user_input)
+        
+        if not is_medical or confidence < 0.3:
+            return None
+        
+        print(f"[医疗RAG] 检测到医疗领域问题: {domain_name}, 置信度: {confidence}")
+        
+        # 检查是否有激活的医疗知识库
+        active_kb = medical_knowledge_manager.get_active_knowledge_base()
+        if not active_kb:
+            print("[医疗RAG] 没有激活的医疗知识库")
+            return None
+        
+        print(f"[医疗RAG] 当前激活的知识库: {active_kb.domain} - {active_kb.name}")
+        
+        # 执行医疗RAG检索
+        retrieved_docs = medical_retriever.retrieve(user_input, k=5)
+        
+        # 生成回答
+        response = medical_response_generator.generate_response(user_input, retrieved_docs, active_kb.name)
+        
+        return {
+            "status": "completed",
+            "answer": response["answer"],
+            "sources": response["sources"],
+            "has_knowledge": response["has_knowledge"],
+            "domain": domain_name,
+            "medical_rag": True
+        }
     
     def execute(self, user_input: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """执行用户请求 - 使用LangGraph状态机"""
@@ -33,6 +75,12 @@ class ExecutionController:
         stream = context.get("stream", False)
         
         print(f"[执行控制器] 开始处理请求")
+        
+        # 先检查是否是医疗领域问题
+        medical_result = self._detect_and_execute_medical_rag(user_input, context)
+        if medical_result:
+            print(f"[执行控制器] 使用医疗RAG处理")
+            return medical_result
         
         # 如果前端传递了历史消息，使用它们构建上下文记忆
         history_messages = context.get("history_messages", [])

@@ -18,11 +18,11 @@ except ImportError:
 class Reranker:
     """重排器类"""
     
-    def __init__(self, model_name: str = "gte-rerank-v2"):
+    def __init__(self, model_name: str = "qwen3-rerank"):
         """初始化重排器
         
         Args:
-            model_name: 模型名称
+            model_name: 模型名称，支持 gte-rerank-v2 和 qwen3-rerank
         """
         self.model_name = model_name
         self.api_key = self._get_api_key()
@@ -93,10 +93,14 @@ class Reranker:
             "Content-Type": "application/json"
         }
         
-        # 准备文档
+        # 准备文档（同时支持text和content字段）
         rerank_docs = []
         for doc in documents:
-            rerank_docs.append(doc.get('text', ''))
+            content = doc.get('content', doc.get('text', ''))
+            if content:
+                rerank_docs.append(content)
+            else:
+                rerank_docs.append('')
         
         # 根据模型类型使用不同的请求格式
         if self.model_name == "gte-rerank-v2":
@@ -113,12 +117,17 @@ class Reranker:
                 }
             }
         else:
-            # qwen3-rerank模型直接在顶层设置参数
+            # qwen3-rerank模型使用标准格式（匹配官方示例）
             data = {
                 "model": self.model_name,
-                "query": query,
-                "documents": rerank_docs,
-                "top_n": top_k
+                "input": {
+                    "query": query,
+                    "documents": rerank_docs
+                },
+                "parameters": {
+                    "top_n": top_k,
+                    "return_documents": True
+                }
             }
         
         # 重试机制
@@ -247,9 +256,9 @@ class Reranker:
         # 向量化查询
         query_vector = embedding_engine.embed(query)
         
-        # 计算每个文档与查询的相似度
+        # 计算每个文档与查询的相似度（同时支持text和content字段）
         for doc in documents:
-            text = doc.get('text', '')
+            text = doc.get('content', doc.get('text', ''))
             doc_vector = embedding_engine.embed(text)
             
             # 计算余弦相似度

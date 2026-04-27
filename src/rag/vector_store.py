@@ -245,7 +245,7 @@ class ChromaVectorStore(VectorStore):
 
 
 class MilvusVectorStore(VectorStore):
-    def __init__(self, embedding_dim: int = 1024):
+    def __init__(self, embedding_dim: int = 768):
         self.embedding_dim = embedding_dim
         self.client = None
         self.collection_name = "eleina_rag"

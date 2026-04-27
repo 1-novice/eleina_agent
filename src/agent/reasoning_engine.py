@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Any
 from src.agent.model_engine import model_engine
 from src.config.config import settings
+from src.prompt import prompt_manager
 
 
 class ReasoningEngine:
@@ -11,7 +12,7 @@ class ReasoningEngine:
         """思考过程，使用CoT"""
         try:
             # 构建思考提示词
-            prompt = self._build_thinking_prompt(user_input, context)
+            prompt = prompt_manager.format_prompt("cot", user_input=user_input, context=context)
             
             # 调用模型进行思考
             request = {
@@ -41,23 +42,6 @@ class ReasoningEngine:
                 "next_step": "answer",
                 "confidence": 0.5
             }
-    
-    def _build_thinking_prompt(self, user_input: str, context: Dict[str, Any]) -> str:
-        """构建思考提示词"""
-        prompt = f"""你是一个全能的智能体动漫角色，现在需要分析用户的请求并进行思考。
-
-用户输入：{user_input}
-
-当前上下文：{context}
-
-请按照以下步骤进行思考：
-1. 我现在要做什么？
-2. 我缺什么信息？
-3. 我该用什么工具？
-4. 结果对不对？
-
-请以自然、清晰的语言表达你的思考过程，最后给出你的决策。"""
-        return prompt
     
     def _parse_thinking_result(self, thinking_content: str) -> Dict[str, Any]:
         """解析思考结果"""
@@ -94,22 +78,7 @@ class ReasoningEngine:
         """规划复杂任务"""
         try:
             # 构建规划提示词
-            prompt = f"""你是一个全能的智能体动漫角色，现在需要对复杂任务进行规划。
-
-复杂任务：{complex_task}
-
-请将该任务分解为具体的步骤，并为每个步骤提供详细的说明。
-
-示例格式：
-步骤1：明确需求
-- 了解用户的具体需求
-- 确认任务的目标和范围
-
-步骤2：收集信息
-- 搜索相关资料
-- 分析现有数据
-
-..."""
+            prompt = prompt_manager.format_prompt("plan", complex_task=complex_task)
             
             # 调用模型生成规划
             request = {
@@ -188,7 +157,8 @@ class ReasoningEngine:
                 tool_results = []
             
             # 构建ReAct提示词
-            prompt = self._build_react_prompt(user_input, context, tool_results)
+            tool_results_str = "\n".join([f"工具结果: {str(result)}" for result in tool_results])
+            prompt = prompt_manager.format_prompt("react", user_input=user_input, context=context, tool_results=tool_results_str)
             
             # 调用模型进行推理
             request = {
@@ -218,29 +188,6 @@ class ReasoningEngine:
                 "observation": "",
                 "final_decision": "抱歉，我暂时无法处理您的请求，请稍后再试。"
             }
-    
-    def _build_react_prompt(self, user_input: str, context: Dict[str, Any], tool_results: List[Dict[str, Any]]) -> str:
-        """构建ReAct提示词"""
-        tool_results_str = "\n".join([f"工具结果: {str(result)}" for result in tool_results])
-        
-        prompt = f"""你是一个全能的智能体动漫角色，使用ReAct模式进行推理。
-
-用户输入：{user_input}
-
-当前上下文：{context}
-
-工具结果：
-{tool_results_str}
-
-请按照以下格式进行思考和决策：
-
-思考：[你的思考过程]
-行动：[选择的工具] [工具参数]
-观察：[工具执行结果]
-思考：[基于结果的思考]
-决策：[最终决策]
-"""
-        return prompt
     
     def _parse_react_result(self, react_content: str) -> Dict[str, Any]:
         """解析ReAct结果"""

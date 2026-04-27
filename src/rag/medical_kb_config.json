@@ -1,0 +1,22 @@
+{
+  "hypertension": {
+    "domain": "hypertension",
+    "name": "高血压诊疗知识库",
+    "description": "包含高血压相关的诊疗规范、用药指导、护理建议等内容",
+    "vector_store_path": "data/vector_store/hypertension",
+    "document_paths": [
+      "data/knowledge/hypertension/"
+    ],
+    "activated": false
+  },
+  "cardiology": {
+    "domain": "cardiology",
+    "name": "心血管疾病知识库",
+    "description": "包含心血管疾病相关的诊疗规范和指南",
+    "vector_store_path": "data/vector_store/cardiology",
+    "document_paths": [
+      "data/knowledge/cardiology/"
+    ],
+    "activated": false
+  }
+}

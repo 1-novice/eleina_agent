@@ -1,5 +1,6 @@
 """上下文构建模块"""
 from typing import Dict, List, Optional, Any
+from src.prompt import prompt_manager
 
 
 class PromptBuilder:
@@ -132,7 +133,8 @@ class PromptBuilder:
         Returns:
             str: 构建的Prompt
         """
-        template = """
+        # 获取RAG提示词模板
+        template = prompt_manager.get_prompt("rag") or """
 请根据下面的参考资料回答用户问题，不要编造。
 如果资料中没有答案，请直接说"根据现有资料无法回答"。
 
@@ -193,9 +195,10 @@ class PromptBuilder:
         messages = []
         
         # 系统消息
+        system_content = prompt_manager.get_prompt("chat") or "你是一个基于知识库回答问题的智能助手，请根据提供的参考资料回答用户问题，不要编造。如果资料中没有答案，请直接说'根据现有资料无法回答'。"
         system_message = {
             "role": "system",
-            "content": "你是一个基于知识库回答问题的智能助手，请根据提供的参考资料回答用户问题，不要编造。如果资料中没有答案，请直接说'根据现有资料无法回答'。"
+            "content": system_content
         }
         messages.append(system_message)
         

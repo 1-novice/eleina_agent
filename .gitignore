@@ -71,6 +71,9 @@ models/
 # 向量数据库
 vector_db/
 
+# 医疗知识库文件（包含敏感数据）
+src/rag/knowledge/
+
 # 备份文件
 *.bak
 *.backup
@@ -90,3 +93,16 @@ coverage/
 *.tar.gz
 *.tar.bz2
 *.rar
+
+# PyTorch 安装包
+*.whl
+
+# LMDB 缓存目录
+data/text2vec_embedding_cache/
+
+# 测试报告文件
+medical_rag_metrics_report_*.txt
+
+# 临时测试文件
+check_embedding_result.py
+checktry_embedding_result.py

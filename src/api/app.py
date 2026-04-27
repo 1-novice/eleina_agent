@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.api.routes import router
+from src.api.medical_routes import router as medical_router
 from src.config.config import settings
 
 app = FastAPI(
     title="Eleina Agent API",
-    description="全能智能体动漫角色Agent API接口",
+    description="全能智能体动漫角色Agent API接口（含医疗RAG）",
     version="1.0.0"
 )
 
@@ -18,6 +19,7 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api/v1")
+app.include_router(medical_router, prefix="/api/v1")
 
 
 @app.get("/")

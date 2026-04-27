@@ -1,6 +1,7 @@
 """上下文裁剪与压缩器 - 管理对话上下文的长度和质量"""
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from src.prompt import prompt_manager
 
 class ContextCompressor:
     """上下文裁剪与压缩器"""
